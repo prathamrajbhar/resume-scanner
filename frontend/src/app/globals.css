@@ -1,0 +1,176 @@
+@import "tailwindcss";
+
+@theme {
+  --font-sans: var(--font-manrope);
+  --font-display: var(--font-space-grotesk);
+}
+
+html {
+  scroll-behavior: smooth;
+}
+
+:root {
+  --app-text: #0f172a;
+  --app-muted: #475569;
+  --app-subtle: #64748b;
+  --app-brand: #2563eb;
+  --app-brand-soft: #dbeafe;
+  --app-focus: #3b82f6;
+  --app-danger: #dc2626;
+  --app-danger-soft: #fee2e2;
+  --app-bg:
+    radial-gradient(circle at 5% 8%, rgba(37, 99, 235, 0.13), transparent 28%),
+    radial-gradient(circle at 92% 10%, rgba(14, 165, 233, 0.11), transparent 24%),
+    radial-gradient(circle at 50% 96%, rgba(56, 189, 248, 0.08), transparent 28%),
+    #f8fafc;
+  --app-grid-line: rgba(15, 23, 42, 0.08);
+  --app-surface: rgba(248, 250, 252, 0.84);
+  --app-surface-elevated: #ffffff;
+  --app-surface-soft: #f1f5f9;
+  --app-border: rgba(148, 163, 184, 0.36);
+  --app-shadow-sm: 0 6px 20px rgba(15, 23, 42, 0.06);
+  --app-shadow-md: 0 16px 38px rgba(15, 23, 42, 0.08);
+  --app-danger-bg: #fff1f2;
+  --app-danger-border: #fecdd3;
+  --app-danger-text: #be123c;
+  --app-success-bg: #ecfdf5;
+  --app-success-text: #047857;
+}
+
+html[data-theme='dark'] {
+  --app-text: #e2e8f0;
+  --app-muted: #93a4bc;
+  --app-subtle: #7b8ba4;
+  --app-brand: #60a5fa;
+  --app-brand-soft: rgba(96, 165, 250, 0.16);
+  --app-focus: #60a5fa;
+  --app-danger: #fb7185;
+  --app-danger-soft: rgba(251, 113, 133, 0.14);
+  --app-bg:
+    radial-gradient(circle at 8% 8%, rgba(59, 130, 246, 0.18), transparent 30%),
+    radial-gradient(circle at 92% 12%, rgba(6, 182, 212, 0.14), transparent 24%),
+    #020617;
+  --app-grid-line: rgba(148, 163, 184, 0.08);
+  --app-surface: rgba(2, 6, 23, 0.76);
+  --app-surface-elevated: #0b1220;
+  --app-surface-soft: #111c2f;
+  --app-border: rgba(148, 163, 184, 0.26);
+  --app-shadow-sm: 0 8px 22px rgba(2, 6, 23, 0.4);
+  --app-shadow-md: 0 20px 40px rgba(2, 6, 23, 0.5);
+  --app-danger-bg: rgba(136, 19, 55, 0.24);
+  --app-danger-border: rgba(244, 114, 182, 0.36);
+  --app-danger-text: #fda4af;
+  --app-success-bg: rgba(6, 95, 70, 0.26);
+  --app-success-text: #6ee7b7;
+}
+
+body {
+  min-height: 100vh;
+  color: var(--app-text);
+  font-family: var(--font-manrope), sans-serif;
+  background: var(--app-bg);
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  transition: background-color 240ms ease, color 240ms ease;
+}
+
+h1,
+h2,
+h3,
+h4 {
+  font-family: var(--font-space-grotesk), sans-serif;
+  letter-spacing: -0.015em;
+}
+
+a,
+button {
+  transition: all 180ms ease;
+}
+
+.fade-up {
+  animation: fade-up 600ms ease both;
+}
+
+.fade-delay-1 {
+  animation-delay: 120ms;
+}
+
+.fade-delay-2 {
+  animation-delay: 220ms;
+}
+
+.fade-delay-3 {
+  animation-delay: 320ms;
+}
+
+.hero-grid {
+  background-image:
+    linear-gradient(to right, var(--app-grid-line) 1px, transparent 1px),
+    linear-gradient(to bottom, var(--app-grid-line) 1px, transparent 1px);
+  background-size: 22px 22px;
+}
+
+.surface-panel {
+  border: 1px solid var(--app-border);
+  background: var(--app-surface);
+  box-shadow: var(--app-shadow-sm);
+  backdrop-filter: blur(14px);
+}
+
+.surface-panel-strong {
+  border: 1px solid var(--app-border);
+  background: var(--app-surface-elevated);
+}
+
+.surface-panel-soft {
+  border: 1px solid var(--app-border);
+  background: var(--app-surface-soft);
+}
+
+.text-muted {
+  color: var(--app-muted);
+}
+
+.text-subtle {
+  color: var(--app-subtle);
+}
+
+.btn-primary {
+  border: 1px solid transparent;
+  background: var(--app-brand);
+  color: #ffffff;
+}
+
+.btn-primary:hover {
+  filter: brightness(0.94);
+}
+
+.btn-secondary {
+  border: 1px solid var(--app-border);
+  background: var(--app-surface-elevated);
+  color: var(--app-text);
+}
+
+.btn-secondary:hover {
+  background: var(--app-surface-soft);
+}
+
+@keyframes fade-up {
+  from {
+    opacity: 0;
+    transform: translateY(14px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation: none !important;
+    transition: none !important;
+  }
+}

@@ -1,0 +1,14 @@
+{
+  "name": "resume-scanner",
+  "version": "1.0.0",
+  "description": "Resume scanning and analysis application",
+  "private": true,
+  "scripts": {
+    "dev": "pnpm -r dev",
+    "build": "pnpm -r build",
+    "install": "pnpm install -r"
+  },
+  "workspaces": [
+    "frontend"
+  ]
+}

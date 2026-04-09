@@ -1,0 +1,74 @@
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+model User {
+  id         String   @id @default(uuid())
+  email      String   @unique
+  full_name  String?
+  avatar_url String?
+  google_id  String?  @unique
+  created_at DateTime @default(now())
+  chats      Chat[]
+}
+
+model Chat {
+  id              String           @id @default(uuid())
+  user_id         String
+  title           String
+  job_description String
+  created_at      DateTime         @default(now())
+  user            User             @relation(fields: [user_id], references: [id])
+  messages        ChatMessage[]
+  scores          CandidateScore[]
+}
+
+model ChatMessage {
+  id               String   @id @default(uuid())
+  chat_id          String
+  role             String
+  content          String
+  created_at       DateTime @default(now())
+  message_metadata Json?
+  chat             Chat     @relation(fields: [chat_id], references: [id])
+}
+
+model Resume {
+  id                String    @id @default(uuid())
+  candidate_id      String
+  drive_file_id     String
+  original_filename String
+  content_text      String
+  created_at        DateTime  @default(now())
+  candidate         Candidate @relation(fields: [candidate_id], references: [id])
+}
+
+model Candidate {
+  id               String           @id @default(uuid())
+  full_name        String
+  email            String?
+  phone            String?
+  location         String?
+  skills           Json?
+  total_experience Float?
+  education        String?
+  resumes          Resume[]
+  scores           CandidateScore[]
+}
+
+model CandidateScore {
+  id           String    @id @default(uuid())
+  chat_id      String
+  candidate_id String
+  model_type   String
+  score        Float
+  breakdown    Json?
+  created_at   DateTime  @default(now())
+  chat         Chat      @relation(fields: [chat_id], references: [id])
+  candidate    Candidate @relation(fields: [candidate_id], references: [id])
+}
