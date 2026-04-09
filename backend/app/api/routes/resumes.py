@@ -3,7 +3,7 @@ from app.api.dependencies import get_current_user
 from app.db.session import get_db
 from app.services.google_drive import GoogleDriveService
 from app.services.nlp_service import NLPService
-from prisma import Prisma
+from app.db.prisma_client import Prisma
 
 router = APIRouter()
 drive_service = GoogleDriveService()

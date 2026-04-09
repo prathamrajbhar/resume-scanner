@@ -4,7 +4,7 @@ from app.db.session import get_db
 from app.services.gmail_service import GmailService
 from app.services.nlp_service import NLPService
 from app.services.google_drive import GoogleDriveService
-from prisma import Prisma
+from app.db.prisma_client import Prisma
 import uuid
 
 router = APIRouter()

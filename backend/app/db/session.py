@@ -1,8 +1,10 @@
 import os
-from prisma import Prisma
 from dotenv import load_dotenv
+from app.db.prisma_client import Prisma
+from pathlib import Path
 
-load_dotenv()
+BASE_DIR = Path(__file__).resolve().parents[2]
+load_dotenv(dotenv_path=BASE_DIR / ".env", override=True)
 
 # Pre-initialized Prisma client
 db = Prisma()

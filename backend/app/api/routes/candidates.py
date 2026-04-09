@@ -1,7 +1,7 @@
 from fastapi import APIRouter, Depends, HTTPException
 from app.api.dependencies import get_current_user
 from app.db.session import get_db
-from prisma import Prisma
+from app.db.prisma_client import Prisma
 
 router = APIRouter()
 

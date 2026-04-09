@@ -3,7 +3,7 @@ from typing import Any
 from fastapi import Depends, HTTPException, status
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 from jose import JWTError, jwt
-from prisma import Prisma
+from app.db.prisma_client import Prisma
 
 from app.core.security import ALGORITHM, SECRET_KEY
 from app.db.session import get_db
