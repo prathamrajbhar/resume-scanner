@@ -17,6 +17,9 @@ const spaceGrotesk = Space_Grotesk({
 export const metadata: Metadata = {
   title: 'Resume Scanner | Hiring Workspace',
   description: 'Modern AI-powered workspace for resume intake, candidate ranking, and recruiter workflows.',
+  icons: {
+    icon: '/favicon.ico',
+  },
 };
 
 export default function RootLayout({
@@ -26,6 +29,9 @@ export default function RootLayout({
 }) {
   return (
     <html lang="en">
+      <head>
+        <link rel="icon" href="/favicon.ico" />
+      </head>
       <body className={`${manrope.variable} ${spaceGrotesk.variable}`}>
         <Providers>
           <AppShell>{children}</AppShell>

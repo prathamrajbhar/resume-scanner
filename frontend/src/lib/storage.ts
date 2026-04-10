@@ -6,6 +6,7 @@ export const SETTINGS_STORAGE_KEY = 'resume_scanner_settings';
 export const CHAT_MESSAGES_STORAGE_KEY = 'resume_scanner_chat_messages';
 export const CHAT_UPLOADS_STORAGE_KEY = 'resume_scanner_chat_uploads';
 export const CHAT_ID_STORAGE_KEY = 'resume_scanner_chat_id';
+export const CHAT_SESSIONS_STORAGE_KEY = 'resume_scanner_chat_sessions';
 
 export const defaultSettings: AppSettings = {
   theme: 'light',
@@ -143,7 +144,9 @@ const attachSystemThemeListener = () => {
 
   systemThemeMediaQuery = window.matchMedia('(prefers-color-scheme: dark)');
   systemThemeListener = () => {
-    document.documentElement.setAttribute('data-theme', systemThemeMediaQuery?.matches ? 'dark' : 'light');
+    const nextTheme = systemThemeMediaQuery?.matches ? 'dark' : 'light';
+    document.documentElement.setAttribute('data-theme', nextTheme);
+    document.documentElement.style.colorScheme = nextTheme;
   };
 
   systemThemeMediaQuery.addEventListener('change', systemThemeListener);
@@ -163,6 +166,7 @@ export const applyStoredTheme = () => {
   }
 
   document.documentElement.setAttribute('data-theme', resolvedTheme);
+  document.documentElement.style.colorScheme = resolvedTheme;
 };
 
 export const clearStoredChats = () => {
@@ -173,6 +177,7 @@ export const clearStoredChats = () => {
   window.localStorage.removeItem(CHAT_MESSAGES_STORAGE_KEY);
   window.localStorage.removeItem(CHAT_UPLOADS_STORAGE_KEY);
   window.localStorage.removeItem(CHAT_ID_STORAGE_KEY);
+  window.localStorage.removeItem(CHAT_SESSIONS_STORAGE_KEY);
   window.dispatchEvent(new Event('resume:chats-cleared'));
 };
 

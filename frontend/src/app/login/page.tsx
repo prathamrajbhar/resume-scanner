@@ -1,14 +1,12 @@
 'use client';
 
+import Image from 'next/image';
 import { Suspense, useEffect, useMemo, useState } from 'react';
-import { GoogleLogin } from '@react-oauth/google';
 import type { CredentialResponse } from '@react-oauth/google';
-import { LockKeyhole, ShieldCheck, Sparkles } from 'lucide-react';
 import { googleLogin } from '@/lib/api';
 import { getStoredToken, getStoredUser, setStoredToken, setStoredUser } from '@/lib/storage';
 import { useRouter, useSearchParams } from 'next/navigation';
-import { Badge } from '@/components/ui/badge';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { GoogleButton } from '@/components/auth/google-button';
 
 const GOOGLE_CLIENT_ID = process.env.NEXT_PUBLIC_GOOGLE_CLIENT_ID || '';
 
@@ -59,73 +57,62 @@ function LoginContent() {
   };
 
   return (
-    <div className="relative min-h-screen overflow-hidden px-5 py-14 sm:px-8">
-      <div className="pointer-events-none absolute inset-0 -z-10 bg-[var(--app-bg)]" />
-      <div className="pointer-events-none absolute left-[-120px] top-[-120px] -z-10 h-[300px] w-[300px] rounded-full bg-blue-400/20 blur-3xl" />
-      <div className="pointer-events-none absolute bottom-[-140px] right-[-80px] -z-10 h-[320px] w-[320px] rounded-full bg-cyan-400/20 blur-3xl" />
+    <div className="relative flex min-h-screen items-center justify-center overflow-hidden px-4 py-8 sm:px-6">
+      <div className="pointer-events-none absolute inset-0 hero-grid opacity-60" />
+      <div className="pointer-events-none absolute inset-0">
+        <div className="absolute left-1/2 top-[-120px] h-[280px] w-[520px] -translate-x-1/2 rounded-full bg-[var(--app-brand-soft)] blur-3xl" />
+      </div>
 
-      <div className="mx-auto grid max-w-5xl items-stretch gap-5 lg:grid-cols-[1.05fr_0.95fr]">
-        <Card className="hidden lg:block">
-          <CardHeader>
-            <Badge className="w-fit">Resume Scanner</Badge>
-            <CardTitle className="mt-2 text-4xl leading-tight">
-            One secure workspace for faster hiring decisions.
-            </CardTitle>
-            <CardDescription className="max-w-lg text-sm">
-            Sign in to upload resumes, run candidate ranking, and manage your hiring pipeline with protected access.
-            </CardDescription>
-          </CardHeader>
-          <CardContent>
-            <div className="grid gap-3">
-              <div className="rounded-xl border border-[var(--app-border)] bg-[var(--app-surface-soft)] p-4">
-                <p className="mb-1 flex items-center gap-1.5 text-xs uppercase tracking-wide text-[var(--app-subtle)]"><ShieldCheck className="h-3.5 w-3.5" />Secure API access</p>
-                <p className="text-sm">All workflow endpoints require authenticated tokens.</p>
-              </div>
-              <div className="rounded-xl border border-[var(--app-border)] bg-[var(--app-surface-soft)] p-4">
-                <p className="mb-1 flex items-center gap-1.5 text-xs uppercase tracking-wide text-[var(--app-subtle)]"><Sparkles className="h-3.5 w-3.5" />Role-ready dashboard</p>
-                <p className="text-sm">Candidates, Chatbase, Analysis, and Gmail sync in one flow.</p>
-              </div>
-            </div>
-          </CardContent>
-        </Card>
+      <div className="surface-panel-strong relative mx-auto flex w-full max-w-sm flex-col rounded-2xl p-6 text-center shadow-md">
+        <div className="mb-4 flex flex-col items-center gap-3">
+          <Image
+            src="/assets/logo-icon.png"
+            width={40}
+            height={40}
+            alt="AI HR Copilot logo"
+            className="mb-3 h-10 w-10 rounded"
+            priority
+          />
+          <h2 className="mb-2 text-2xl font-semibold tracking-tight text-[var(--app-text)]">Welcome to AI HR Copilot</h2>
+          <p className="mb-1 text-sm text-gray-500">Sign in or create an account to continue</p>
+          <h1 className="text-lg font-medium text-[var(--app-text)]">Log in or sign up</h1>
+          <p className="text-sm text-gray-400">Continue to AI HR Copilot</p>
+        </div>
 
-        <Card>
-          <CardHeader>
-            <Badge className="w-fit">Account Access</Badge>
-            <CardTitle className="mt-2 flex items-center gap-2 text-3xl sm:text-4xl"><LockKeyhole className="h-6 w-6" />Sign in</CardTitle>
-            <CardDescription>Use your Google account to continue to your workspace.</CardDescription>
-          </CardHeader>
-          <CardContent>
+        <div className="grid gap-4">
+          <GoogleButton
+            loading={loading}
+            disabled={!GOOGLE_CLIENT_ID}
+            onSuccess={handleGoogleSuccess}
+            onError={() => setError('Invalid Google token')}
+          />
 
-          {!GOOGLE_CLIENT_ID ? (
-            <p className="rounded-md border border-[var(--app-danger-border)] bg-[var(--app-danger-bg)] p-3 text-sm text-[var(--app-danger-text)]">
-              Missing NEXT_PUBLIC_GOOGLE_CLIENT_ID in frontend environment configuration.
+          <div className="flex items-center gap-2 text-xs font-medium uppercase tracking-wide text-subtle">
+            <span className="h-px flex-1 bg-[var(--app-border)]" />
+            <span>OR</span>
+            <span className="h-px flex-1 bg-[var(--app-border)]" />
+          </div>
+
+          <button
+            type="button"
+            onClick={() => {
+              if (typeof window !== 'undefined') {
+                window.localStorage.setItem('temp_dashboard_access', '1');
+                window.dispatchEvent(new Event('resume:auth-updated'));
+              }
+              router.push('/dashboard');
+            }}
+            className="btn-secondary flex h-11 w-full items-center justify-center gap-2 rounded-full px-4 text-sm font-medium hover:-translate-y-0.5"
+          >
+            Continue to Dashboard (Temp)
+          </button>
+
+          {error ? (
+            <p className="rounded-xl border border-[var(--app-danger-border)] bg-[var(--app-danger-bg)] px-3 py-2 text-sm text-[var(--app-danger-text)]">
+              {error}
             </p>
-          ) : (
-            <div className="flex min-h-14 items-center justify-center rounded-xl border border-[var(--app-border)] bg-[var(--app-surface-soft)] p-4">
-              {loading ? (
-                <div className="flex items-center gap-2 text-sm text-[var(--app-muted)]">
-                  <div className="h-5 w-5 animate-spin rounded-full border-2 border-[var(--app-border)] border-t-[var(--app-text)]" />
-                  Verifying account...
-                </div>
-              ) : (
-                <GoogleLogin
-                  onSuccess={handleGoogleSuccess}
-                  onError={() => setError('Google login failed. Please try again.')}
-                  useOneTap
-                  theme="outline"
-                  size="large"
-                  shape="pill"
-                />
-              )}
-            </div>
-          )}
-
-            {error ? <p className="mt-4 rounded-md border border-[var(--app-danger-border)] bg-[var(--app-danger-bg)] p-3 text-sm text-[var(--app-danger-text)]">{error}</p> : null}
-
-            <p className="mt-5 text-xs text-[var(--app-subtle)]">By continuing, you agree to your organization access policies.</p>
-          </CardContent>
-        </Card>
+          ) : null}
+        </div>
       </div>
     </div>
   );

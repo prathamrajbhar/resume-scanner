@@ -1,166 +1,253 @@
 'use client';
 
-import { FormEvent, useState } from 'react';
-import Link from 'next/link';
-import { analyzeJobDescription } from '@/lib/api';
-import { AnalyzeResponse, ScoringModel } from '@/types/resume';
-import { useMemo } from 'react';
-import { ArrowUpRight, Trophy } from 'lucide-react';
-import { Badge } from '@/components/ui/badge';
-import { Button } from '@/components/ui/button';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { Textarea } from '@/components/ui/textarea';
+import { useMemo, useState } from 'react';
+import { AnalysisBadge } from '@/components/analyze/Badge';
+import { AnalysisTable } from '@/components/analyze/AnalysisTable';
+import { StatsCard } from '@/components/analyze/StatsCard';
 
-const modelOptions: ScoringModel[] = ['ensemble', 'hybrid', 'bert', 'tf-idf'];
+type AnalysisReportRow = {
+  id: string;
+  filename: string;
+  role: string;
+  score: number;
+  topSkills: string[];
+};
+
+const reportRows: AnalysisReportRow[] = [
+  {
+    id: 'cand-1',
+    filename: 'Aarav_Shah_Backend.pdf',
+    role: 'Senior Backend Engineer',
+    score: 32,
+    topSkills: ['Python', 'FastAPI', 'PostgreSQL'],
+  },
+  {
+    id: 'cand-2',
+    filename: 'Nina_Williams_FullStack.docx',
+    role: 'Full Stack Product Engineer',
+    score: 27,
+    topSkills: ['React', 'TypeScript', 'Node.js'],
+  },
+  {
+    id: 'cand-3',
+    filename: 'Rahul_Verma_DataAnalyst.pdf',
+    role: 'Talent Analytics Specialist',
+    score: 21,
+    topSkills: ['NLP', 'Tableau', 'Prompt Engineering'],
+  },
+  {
+    id: 'cand-4',
+    filename: 'Sara_Khan_Engineer.txt',
+    role: 'Senior Backend Engineer',
+    score: 18,
+    topSkills: ['Django', 'System Design', 'Docker'],
+  },
+  {
+    id: 'cand-5',
+    filename: 'Fatima_Ali_MLEngineer.pdf',
+    role: 'Talent Analytics Specialist',
+    score: 16,
+    topSkills: ['Machine Learning', 'PyTorch', 'NLP'],
+  },
+  {
+    id: 'cand-6',
+    filename: 'Rohan_Singh_Backend.docx',
+    role: 'Senior Backend Engineer',
+    score: 14,
+    topSkills: ['Go', 'Redis', 'Kubernetes'],
+  },
+];
 
 export default function AnalyzePage() {
-  const [jobDescription, setJobDescription] = useState('');
-  const [modelType, setModelType] = useState<ScoringModel>('ensemble');
-  const [chatId, setChatId] = useState<string | undefined>(undefined);
-  const [result, setResult] = useState<AnalyzeResponse | null>(null);
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState<string | null>(null);
+  const [selectedRole, setSelectedRole] = useState<string>('All Roles');
+  const [selectedCandidates, setSelectedCandidates] = useState<Record<string, boolean>>({});
+  const [shortlistedCandidates, setShortlistedCandidates] = useState<Record<string, boolean>>({
+    'cand-1': true,
+    'cand-2': true,
+  });
 
-  const topCandidate = useMemo(() => result?.candidates?.[0], [result]);
+  const roleOptions = useMemo(() => {
+    const roles = Array.from(new Set(reportRows.map((row) => row.role))).sort();
+    return ['All Roles', ...roles];
+  }, []);
 
-  const handleAnalyze = async (event: FormEvent) => {
-    event.preventDefault();
-    if (!jobDescription.trim()) {
-      setError('Please provide a job description.');
-      return;
+  const filteredBaseRows = useMemo(() => {
+    if (selectedRole === 'All Roles') {
+      return reportRows;
     }
 
-    setLoading(true);
-    setError(null);
+    return reportRows.filter((row) => row.role === selectedRole);
+  }, [selectedRole]);
 
-    try {
-      const response = await analyzeJobDescription({
-        message: jobDescription,
-        chat_id: chatId,
-        model_type: modelType,
-      });
+  const rankedRows = useMemo(() => {
+    return [...filteredBaseRows]
+      .sort((a, b) => b.score - a.score)
+      .map((row, index) => ({ ...row, rank: index + 1 }));
+  }, [filteredBaseRows]);
 
-      setResult(response);
-      setChatId(response.chat_id);
-    } catch (err) {
-      setError(err instanceof Error ? err.message : 'Analysis failed.');
-    } finally {
-      setLoading(false);
+  const topFiveCandidates = useMemo(() => rankedRows.slice(0, 5), [rankedRows]);
+
+  const totalResumes = rankedRows.length;
+
+  const averageMatch = useMemo(() => {
+    if (rankedRows.length === 0) {
+      return 0;
     }
+
+    const total = rankedRows.reduce((sum, row) => sum + row.score, 0);
+    return Math.round(total / rankedRows.length);
+  }, [rankedRows]);
+
+  const selectedCount = useMemo(() => {
+    return rankedRows.filter((row) => selectedCandidates[row.id]).length;
+  }, [rankedRows, selectedCandidates]);
+
+  const shortlistedCount = useMemo(() => {
+    return rankedRows.filter((row) => shortlistedCandidates[row.id]).length;
+  }, [rankedRows, shortlistedCandidates]);
+
+  const toggleShortlist = (id: string) => {
+    setShortlistedCandidates((prev) => ({
+      ...prev,
+      [id]: !prev[id],
+    }));
+  };
+
+  const toggleSelect = (id: string) => {
+    setSelectedCandidates((prev) => ({
+      ...prev,
+      [id]: !prev[id],
+    }));
   };
 
   return (
     <div className="space-y-6">
-      <Card>
-        <CardHeader>
-          <Badge className="w-fit">Candidate Ranking</Badge>
-          <CardTitle className="text-3xl">Analyze Candidate Fit</CardTitle>
-          <CardDescription>Use job description matching to score candidate quality by model.</CardDescription>
-        </CardHeader>
-        <CardContent>
-          <form onSubmit={handleAnalyze} className="space-y-4">
-            <div>
-              <label htmlFor="modelType" className="mb-2 block text-sm font-medium">
-                Scoring model
-              </label>
-              <select
-                id="modelType"
-                value={modelType}
-                onChange={(event) => setModelType(event.target.value as ScoringModel)}
-                className="h-10 w-full rounded-md border border-[var(--app-border)] bg-[var(--app-surface)] px-3 text-sm"
+      <header className="rounded-2xl border border-gray-200 bg-white p-5 shadow-sm">
+        <div className="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
+          <div className="space-y-2">
+            <h1 className="font-display text-3xl font-semibold tracking-tight text-gray-900">System Overview</h1>
+            <p className="text-sm text-gray-500">Real-time analytics of resume processing and skill matching.</p>
+          </div>
+
+          <div className="w-full lg:w-[300px]">
+            <label htmlFor="role-filter" className="mb-2 block text-sm font-medium text-gray-600">
+              Select Job Role
+            </label>
+            <select
+              id="role-filter"
+              value={selectedRole}
+              onChange={(event) => setSelectedRole(event.target.value)}
+              className="h-10 w-full rounded-xl border border-gray-300 bg-white px-3 text-sm text-gray-700 shadow-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500"
+            >
+              {roleOptions.map((role) => (
+                <option key={role} value={role}>
+                  {role}
+                </option>
+              ))}
+            </select>
+          </div>
+        </div>
+      </header>
+
+      <section className="grid grid-cols-1 gap-4 md:grid-cols-3">
+        <StatsCard
+          title="Total Resumes"
+          value={String(totalResumes)}
+          subtitle="+12% from last month"
+          subtitleTone="success"
+          icon={<span aria-hidden="true">RS</span>}
+        />
+        <StatsCard
+          title="Average Match"
+          value={`${averageMatch}%`}
+          subtitle={selectedRole === 'All Roles' ? 'Across all job roles' : selectedRole}
+          icon={<span aria-hidden="true">AM</span>}
+        />
+        <StatsCard
+          title="Shortlisted"
+          value={String(shortlistedCount)}
+          subtitle="Qualified Candidates"
+          icon={<span aria-hidden="true">SC</span>}
+        />
+      </section>
+
+      <section className="rounded-2xl border border-gray-200 bg-white p-5 shadow-sm">
+        <div className="mb-4 flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+          <div>
+            <h2 className="font-display text-xl font-semibold text-gray-900">Top 5 Candidates</h2>
+            <p className="mt-1 text-xs text-gray-500">Top candidates are ranked based on AI score</p>
+          </div>
+          <AnalysisBadge tone="neutral">{selectedCount} Candidates Selected</AnalysisBadge>
+        </div>
+
+        <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-5">
+          {topFiveCandidates.map((candidate) => {
+            const isSelected = Boolean(selectedCandidates[candidate.id]);
+            const isTopOne = candidate.rank === 1;
+            const isTopTwo = candidate.rank === 2;
+            const isTopThree = candidate.rank === 3;
+
+            const topStyleClass = isTopOne
+              ? 'bg-green-50 border border-green-300'
+              : isTopTwo
+                ? 'bg-blue-50 border border-blue-300'
+                : isTopThree
+                  ? 'bg-gray-50 border border-gray-300'
+                  : 'bg-white border border-gray-200';
+
+            const topBadge = isTopOne ? 'Top 1' : isTopTwo ? 'Top 2' : isTopThree ? 'Top 3' : null;
+
+            return (
+              <article
+                key={candidate.id}
+                className={`h-full rounded-xl p-4 text-left shadow-sm transition hover:shadow-md ${
+                  isSelected ? `${topStyleClass} ring-2 ring-blue-500` : topStyleClass
+                }`}
               >
-                {modelOptions.map((option) => (
-                  <option key={option} value={option}>
-                    {option}
-                  </option>
-                ))}
-              </select>
-            </div>
+                <div className="flex h-full flex-col justify-between space-y-2 text-left">
+                  <div className="flex items-center justify-between gap-2 text-left">
+                  <p className="truncate text-sm font-semibold text-gray-900">{candidate.filename}</p>
+                  {topBadge ? (
+                    <span className="inline-flex shrink-0 items-center justify-center whitespace-nowrap rounded-full bg-gray-100 px-2 py-1 text-xs leading-none text-gray-600">
+                      {topBadge}
+                    </span>
+                  ) : null}
+                  </div>
 
-            <div>
-              <label htmlFor="jobDescription" className="mb-2 block text-sm font-medium">
-                Job description
-              </label>
-              <Textarea
-                id="jobDescription"
-                value={jobDescription}
-                onChange={(event) => setJobDescription(event.target.value)}
-                placeholder="Example: Senior Backend Engineer with Python, FastAPI, PostgreSQL, AWS, and strong system design experience..."
-                className="min-h-[220px]"
-              />
-            </div>
+                  <p className="text-sm text-gray-700">{candidate.score}% Match</p>
+                  <p className="line-clamp-2 text-xs leading-relaxed text-gray-500">Top skills: {candidate.topSkills.join(', ')}</p>
 
-            {error ? <p className="rounded-md border border-[var(--app-danger-border)] bg-[var(--app-danger-bg)] p-3 text-sm text-[var(--app-danger-text)]">{error}</p> : null}
+                  <button
+                    type="button"
+                    onClick={() => toggleSelect(candidate.id)}
+                    className={`mt-auto w-full rounded-lg px-3 py-2 text-sm font-medium transition ${
+                      isSelected
+                        ? 'bg-blue-600 text-white hover:bg-blue-700'
+                        : 'border border-gray-300 bg-white text-gray-700 hover:bg-gray-50'
+                    }`}
+                  >
+                    {isSelected ? 'Selected' : 'Final Select'}
+                  </button>
+                </div>
+              </article>
+            );
+          })}
 
-            <Button type="submit" disabled={loading}>
-              {loading ? 'Analyzing...' : 'Run Analysis'}
-            </Button>
-          </form>
-        </CardContent>
-      </Card>
+          {topFiveCandidates.length === 0 ? (
+            <p className="col-span-full rounded-xl border border-dashed border-gray-300 bg-gray-50 p-6 text-center text-sm text-gray-500">
+              No candidates available for the selected role.
+            </p>
+          ) : null}
+        </div>
+      </section>
 
-      {result ? (
-        <section className="grid gap-5 lg:grid-cols-[0.9fr_1.1fr]">
-          <Card>
-            <CardHeader>
-              <div className="flex items-center gap-2">
-                <Trophy className="h-4 w-4 text-amber-500" />
-                <CardTitle className="text-base">Top match</CardTitle>
-              </div>
-              <CardDescription>Highest scoring candidate from this run</CardDescription>
-            </CardHeader>
-            <CardContent>
-            {topCandidate ? (
-              <>
-                <h2 className="text-2xl font-semibold">{topCandidate.full_name}</h2>
-                <p className="mt-1 text-sm text-[var(--app-muted)]">Score: {Math.round(topCandidate.score)} / 100</p>
-                <Button asChild className="mt-4">
-                  <Link href={`/candidates/${topCandidate.id}`}>Open candidate</Link>
-                </Button>
-              </>
-            ) : (
-              <p className="text-sm text-[var(--app-muted)]">No ranked candidates returned.</p>
-            )}
-            </CardContent>
-          </Card>
-
-          <Card>
-            <CardHeader>
-              <CardTitle>Ranked Candidates</CardTitle>
-              <CardDescription>{result.message}</CardDescription>
-            </CardHeader>
-            <CardContent>
-              <div className="space-y-3">
-                {result.candidates.map((candidate) => (
-                  <article key={candidate.id} className="rounded-lg border border-[var(--app-border)] bg-[var(--app-surface-soft)] p-4">
-                    <div className="flex items-start justify-between gap-4">
-                      <div>
-                        <p className="font-semibold">{candidate.full_name}</p>
-                        <p className="mt-1 text-sm text-[var(--app-muted)]">
-                          {(candidate.matching_skills || []).slice(0, 6).join(', ') || 'No matching skills provided'}
-                        </p>
-                      </div>
-                      <Badge>{Math.round(candidate.score)}</Badge>
-                    </div>
-                    <Button asChild variant="ghost" size="sm" className="mt-2 px-0 text-[var(--app-brand)]">
-                      <Link href={`/candidates/${candidate.id}`}>
-                        Open profile
-                        <ArrowUpRight className="h-4 w-4" />
-                      </Link>
-                    </Button>
-                  </article>
-                ))}
-
-                {result.candidates.length === 0 ? (
-                  <p className="rounded-md border border-[var(--app-border)] bg-[var(--app-surface-soft)] p-3 text-sm text-[var(--app-muted)]">
-                    No candidates found. Upload resumes first in Chatbase.
-                  </p>
-                ) : null}
-              </div>
-            </CardContent>
-          </Card>
-        </section>
-      ) : null}
+      <AnalysisTable
+        rows={rankedRows}
+        shortlistedById={shortlistedCandidates}
+        selectedById={selectedCandidates}
+        onToggleShortlist={toggleShortlist}
+        onToggleSelect={toggleSelect}
+      />
     </div>
   );
 }

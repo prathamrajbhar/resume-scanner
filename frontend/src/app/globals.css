@@ -7,6 +7,8 @@
 
 html {
   scroll-behavior: smooth;
+  color-scheme: light;
+  transition: background-color 240ms ease, color 240ms ease, border-color 240ms ease;
 }
 
 :root {
@@ -62,6 +64,101 @@ html[data-theme='dark'] {
   --app-danger-text: #fda4af;
   --app-success-bg: rgba(6, 95, 70, 0.26);
   --app-success-text: #6ee7b7;
+  color-scheme: dark;
+}
+
+/* Dark mode compatibility for legacy hardcoded utility classes. */
+html[data-theme='dark'] .bg-white {
+  background-color: var(--app-surface-elevated);
+}
+
+html[data-theme='dark'] .bg-white\/90 {
+  background-color: rgba(11, 18, 32, 0.9);
+}
+
+html[data-theme='dark'] .bg-gray-50 {
+  background-color: var(--app-surface-soft);
+}
+
+html[data-theme='dark'] .bg-gray-100 {
+  background-color: #1a2538;
+}
+
+html[data-theme='dark'] .border-gray-200,
+html[data-theme='dark'] .border-gray-300 {
+  border-color: var(--app-border);
+}
+
+html[data-theme='dark'] .border-slate-200,
+html[data-theme='dark'] .border-slate-300,
+html[data-theme='dark'] .border-slate-200\/80 {
+  border-color: var(--app-border);
+}
+
+html[data-theme='dark'] .text-gray-900,
+html[data-theme='dark'] .text-gray-800,
+html[data-theme='dark'] .text-gray-700 {
+  color: var(--app-text);
+}
+
+html[data-theme='dark'] .text-slate-900,
+html[data-theme='dark'] .text-slate-800,
+html[data-theme='dark'] .text-slate-700 {
+  color: var(--app-text);
+}
+
+html[data-theme='dark'] .text-gray-600,
+html[data-theme='dark'] .text-gray-500,
+html[data-theme='dark'] .text-gray-400 {
+  color: var(--app-muted);
+}
+
+html[data-theme='dark'] .text-slate-600,
+html[data-theme='dark'] .text-slate-500,
+html[data-theme='dark'] .text-slate-400 {
+  color: var(--app-muted);
+}
+
+html[data-theme='dark'] .placeholder\:text-slate-400::placeholder {
+  color: var(--app-subtle);
+}
+
+html[data-theme='dark'] .bg-slate-100 {
+  background-color: var(--app-surface-soft);
+}
+
+html[data-theme='dark'] .hover\:bg-gray-50:hover,
+html[data-theme='dark'] .hover\:bg-gray-100:hover,
+html[data-theme='dark'] .hover\:bg-gray-200:hover {
+  background-color: #1f2b41;
+}
+
+html[data-theme='dark'] .hover\:bg-slate-100:hover,
+html[data-theme='dark'] .hover\:bg-slate-200:hover {
+  background-color: #1f2b41;
+}
+
+html[data-theme='dark'] .hover\:text-gray-700:hover,
+html[data-theme='dark'] .hover\:text-slate-900:hover {
+  color: var(--app-text);
+}
+
+html[data-theme='dark'] .from-blue-50 {
+  --tw-gradient-from: rgba(96, 165, 250, 0.16);
+  --tw-gradient-stops: var(--tw-gradient-from), var(--tw-gradient-to);
+}
+
+html[data-theme='dark'] .to-indigo-50 {
+  --tw-gradient-to: #1a2538;
+}
+
+html[data-theme='dark'] .from-slate-50 {
+  --tw-gradient-from: var(--app-surface-soft);
+  --tw-gradient-stops: var(--tw-gradient-from), var(--tw-gradient-to);
+}
+
+html[data-theme='dark'] .to-white {
+  --tw-gradient-to: var(--app-surface-elevated);
 }
 
 body {
@@ -71,7 +168,7 @@ body {
   background: var(--app-bg);
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
-  transition: background-color 240ms ease, color 240ms ease;
+  transition: background-color 240ms ease, color 240ms ease, border-color 240ms ease, box-shadow 240ms ease;
 }
 
 h1,
@@ -103,6 +200,18 @@ button {
   animation-delay: 320ms;
 }
 
+.slide-down-in {
+  animation: slide-down-in 260ms ease-out both;
+}
+
+.slide-up-out {
+  animation: slide-up-out 220ms ease-in both;
+}
+
+.dropdown-pop {
+  animation: dropdown-pop 180ms ease-out both;
+}
+
 .hero-grid {
   background-image:
     linear-gradient(to right, var(--app-grid-line) 1px, transparent 1px),
@@ -114,17 +223,21 @@ button {
   border: 1px solid var(--app-border);
   background: var(--app-surface);
   box-shadow: var(--app-shadow-sm);
+  -webkit-backdrop-filter: blur(14px);
   backdrop-filter: blur(14px);
+  transition: background-color 240ms ease, color 240ms ease, border-color 240ms ease, box-shadow 240ms ease;
 }
 
 .surface-panel-strong {
   border: 1px solid var(--app-border);
   background: var(--app-surface-elevated);
+  transition: background-color 240ms ease, color 240ms ease, border-color 240ms ease, box-shadow 240ms ease;
 }
 
 .surface-panel-soft {
   border: 1px solid var(--app-border);
   background: var(--app-surface-soft);
+  transition: background-color 240ms ease, color 240ms ease, border-color 240ms ease, box-shadow 240ms ease;
 }
 
 .text-muted {
@@ -139,6 +252,7 @@ button {
   border: 1px solid transparent;
   background: var(--app-brand);
   color: #ffffff;
+  transition: background-color 180ms ease, color 180ms ease, border-color 180ms ease, box-shadow 180ms ease, transform 180ms ease;
 }
 
 .btn-primary:hover {
@@ -149,6 +263,7 @@ button {
   border: 1px solid var(--app-border);
   background: var(--app-surface-elevated);
   color: var(--app-text);
+  transition: background-color 180ms ease, color 180ms ease, border-color 180ms ease, box-shadow 180ms ease, transform 180ms ease;
 }
 
 .btn-secondary:hover {
@@ -163,6 +278,39 @@ button {
   to {
     opacity: 1;
     transform: translateY(0);
+  }
+}
+
+@keyframes slide-down-in {
+  from {
+    opacity: 0;
+    transform: translateY(-14px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes slide-up-out {
+  from {
+    opacity: 1;
+    transform: translateY(0);
+  }
+  to {
+    opacity: 0;
+    transform: translateY(-14px);
+  }
+}
+
+@keyframes dropdown-pop {
+  from {
+    opacity: 0;
+    transform: translateY(8px) scale(0.97);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
   }
 }
 

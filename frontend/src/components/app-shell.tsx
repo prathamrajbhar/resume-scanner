@@ -1,29 +1,38 @@
 'use client';
 
+import Image from 'next/image';
 import Link from 'next/link';
 import { usePathname, useRouter } from 'next/navigation';
 import { PropsWithChildren, useEffect, useMemo, useRef, useState } from 'react';
 import {
   BarChart3,
   Bot,
+  BriefcaseBusiness,
   LayoutDashboard,
+  LogOut,
   Mail,
-  Menu,
   PanelLeft,
   Settings,
+  User as UserIcon,
+  X,
   Users,
 } from 'lucide-react';
+import { ConfirmModal } from '@/components/chat/confirm-modal';
 import { applyStoredTheme, clearStoredAuth, getStoredToken, getStoredUser } from '@/lib/storage';
 import { User } from '@/types/resume';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
+import { AppModal } from '@/components/ui/app-modal';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
+import { ProfileTabsModal } from '@/components/ui/profile-tabs-modal';
 import { Separator } from '@/components/ui/separator';
+import { SettingsModalContent } from '@/components/ui/settings-modal-content';
 import { cn } from '@/lib/utils';
 
 const navItems = [
   { href: '/', label: 'Dashboard', icon: LayoutDashboard, badge: null },
   { href: '/chatbase', label: 'Chatbase', icon: Bot, badge: 'new' },
+  { href: '/job-roles', label: 'Job Roles', icon: BriefcaseBusiness, badge: null },
   { href: '/analyze', label: 'Analyze', icon: BarChart3, badge: null },
   { href: '/candidates', label: 'Candidates', icon: Users, badge: null },
   { href: '/gmail', label: 'Gmail Sync', icon: Mail, badge: null },
@@ -34,16 +43,24 @@ export default function AppShell({ children }: PropsWithChildren) {
   const pathname = usePathname();
   const [currentUser, setCurrentUser] = useState<User | null>(null);
   const [hasToken, setHasToken] = useState(false);
+  const [hasTempDashboardAccess, setHasTempDashboardAccess] = useState(false);
   const [authHydrated, setAuthHydrated] = useState(false);
   const [desktopSidebarCollapsed, setDesktopSidebarCollapsed] = useState(false);
   const [mobileOpen, setMobileOpen] = useState(false);
   const [profileMenuOpen, setProfileMenuOpen] = useState(false);
+  const [isSettingsOpen, setIsSettingsOpen] = useState(false);
+  const [isProfileOpen, setIsProfileOpen] = useState(false);
+  const [isSignOutConfirmOpen, setIsSignOutConfirmOpen] = useState(false);
   const profileMenuRef = useRef<HTMLDivElement | null>(null);
   const isPublicRoute = pathname === '/login';
+  const isChatFocusRoute = pathname.startsWith('/chatbase');
 
   const hydrateAuth = () => {
     setCurrentUser(getStoredUser());
     setHasToken(Boolean(getStoredToken()));
+    if (typeof window !== 'undefined') {
+      setHasTempDashboardAccess(window.localStorage.getItem('temp_dashboard_access') === '1');
+    }
   };
 
   useEffect(() => {
@@ -71,7 +88,14 @@ export default function AppShell({ children }: PropsWithChildren) {
     };
   }, []);
 
-  const needsAuthRedirect = !isPublicRoute && authHydrated && (!hasToken || !currentUser?.email);
+  const hasTempAccessFromStorage =
+    typeof window !== 'undefined' && window.localStorage.getItem('temp_dashboard_access') === '1';
+
+  const needsAuthRedirect =
+    !isPublicRoute &&
+    authHydrated &&
+    !(hasTempDashboardAccess || hasTempAccessFromStorage) &&
+    (!hasToken || !currentUser?.email);
 
   useEffect(() => {
     if (!needsAuthRedirect) {
@@ -125,7 +149,15 @@ export default function AppShell({ children }: PropsWithChildren) {
 
   const handleLogout = () => {
     clearStoredAuth();
+    if (typeof window !== 'undefined') {
+      window.localStorage.removeItem('temp_dashboard_access');
+    }
     router.replace('/login');
+  };
+
+  const handleSignOutRequest = () => {
+    setProfileMenuOpen(false);
+    setIsSignOutConfirmOpen(true);
   };
 
   if (isPublicRoute) {
@@ -136,6 +168,14 @@ export default function AppShell({ children }: PropsWithChildren) {
     return (
       <div className="flex min-h-screen items-center justify-center px-6 text-center text-[var(--app-muted)]">
         <div className="surface-panel rounded-2xl px-6 py-5">Preparing your secure workspace...</div>
+      </div>
+    );
+  }
+
+  if (isChatFocusRoute) {
+    return (
+      <div className="min-h-screen bg-[var(--app-bg)] text-[var(--app-text)]">
+        <main className="min-h-screen">{children}</main>
       </div>
     );
   }
@@ -154,25 +194,47 @@ export default function AppShell({ children }: PropsWithChildren) {
       <div className="mx-auto flex min-h-screen w-full max-w-[1480px]">
         <aside
           className={cn(
-            'fixed inset-y-0 left-0 z-50 w-[280px] border-r border-[var(--app-border)] bg-[var(--app-surface)] px-3 py-4 shadow-[var(--app-shadow-md)] transition-all duration-300 lg:sticky lg:translate-x-0',
+            'fixed inset-y-0 left-0 z-50 w-[280px] border-r border-[var(--app-border)] bg-[var(--app-surface)] px-3 py-4 shadow-[var(--app-shadow-md)] transition-all duration-300 lg:sticky lg:top-0 lg:h-screen lg:translate-x-0',
             mobileOpen ? 'translate-x-0' : '-translate-x-full',
             compactDesktop ? 'lg:w-[90px]' : 'lg:w-[280px]'
           )}
         >
           <div className="flex h-full flex-col">
             <div className={cn('mb-4 flex items-center', compactDesktop ? 'justify-center' : 'justify-between')}>
-              <Link href="/" className={cn('flex items-center', compactDesktop ? 'justify-center' : 'gap-3')}>
-                <span className="flex h-9 w-9 items-center justify-center rounded-lg bg-[var(--app-brand)] text-sm font-bold text-white">
-                  RS
-                </span>
+              <Link
+                href="/dashboard"
+                className={cn(
+                  'flex items-center rounded-lg transition-transform duration-200 hover:scale-[1.02] hover:opacity-90',
+                  compactDesktop ? 'justify-center' : 'gap-3'
+                )}
+              >
+                <Image
+                  src="/assets/logo-icon.png"
+                  width={24}
+                  height={24}
+                  alt="AI HR Copilot logo"
+                  className="h-6 w-6 rounded"
+                  priority
+                />
                 <div className={cn(compactDesktop && 'lg:hidden')}>
                   <p className="font-display text-base font-semibold">Resume Scanner</p>
                   <p className="text-xs text-[var(--app-muted)]">Production Workspace</p>
                 </div>
               </Link>
-              <Button variant="ghost" size="icon" className="lg:hidden" onClick={() => setMobileOpen(false)}>
-                <Menu className="h-4 w-4" />
-              </Button>
+              <div className="flex items-center gap-1">
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  className="hidden lg:inline-flex"
+                  onClick={() => setDesktopSidebarCollapsed((prev) => !prev)}
+                  aria-label={compactDesktop ? 'Expand sidebar' : 'Collapse sidebar'}
+                >
+                  <PanelLeft className="h-4 w-4" />
+                </Button>
+                <Button variant="ghost" size="icon" className="lg:hidden" onClick={() => setMobileOpen(false)}>
+                  <X className="h-4 w-4" />
+                </Button>
+              </div>
             </div>
 
             <Separator className="mb-3" />
@@ -212,27 +274,55 @@ export default function AppShell({ children }: PropsWithChildren) {
               })}
             </nav>
 
-            <div ref={profileMenuRef} className="relative mt-3">
+            <div ref={profileMenuRef} className="relative mt-auto pt-3">
               {profileMenuOpen ? (
                 <div className={cn(
-                  'absolute bottom-[calc(100%+8px)] z-20 w-full rounded-xl border border-[var(--app-border)] bg-[var(--app-surface-elevated)] p-2 shadow-[var(--app-shadow-md)]',
-                  compactDesktop && 'lg:left-full lg:ml-3 lg:w-[220px]'
+                  'dropdown-pop absolute bottom-[calc(100%+10px)] z-20 w-full rounded-2xl border border-[var(--app-border)] bg-[var(--app-surface-elevated)] p-4 shadow-[var(--app-shadow-md)] transition duration-200 hover:scale-[1.02]',
+                  compactDesktop && 'lg:left-full lg:ml-3 lg:w-[304px]'
                 )}>
-                  <Link href="/profile" className="block rounded-md px-3 py-2 text-sm text-[var(--app-muted)] hover:bg-[var(--app-surface-soft)] hover:text-[var(--app-text)]">
-                    Profile
-                  </Link>
-                  <Link href="/settings" className="block rounded-md px-3 py-2 text-sm text-[var(--app-muted)] hover:bg-[var(--app-surface-soft)] hover:text-[var(--app-text)]">
+                  <div className="flex items-center gap-3 rounded-xl bg-gradient-to-r from-blue-50 to-indigo-50 p-3">
+                    <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-blue-500 text-sm font-semibold text-white">
+                      {userInitials}
+                    </div>
+                    <div className="min-w-0">
+                      <p className="truncate text-sm font-semibold text-[var(--app-text)]">{currentUser?.full_name || 'Name unavailable'}</p>
+                      <p className="truncate text-xs text-[var(--app-muted)]">{currentUser?.email || 'Email unavailable'}</p>
+                    </div>
+                  </div>
+
+                  <div className="my-2 border-t border-[var(--app-border)]" />
+
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setProfileMenuOpen(false);
+                      setIsProfileOpen(true);
+                    }}
+                    className="flex w-full items-center gap-2 rounded-lg px-3 py-2 text-left text-sm text-[var(--app-text)] transition hover:bg-[var(--app-surface-soft)]"
+                  >
+                    <UserIcon className="h-4 w-4" />
+                    View Profile
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setProfileMenuOpen(false);
+                      setIsSettingsOpen(true);
+                    }}
+                    className="flex w-full items-center gap-2 rounded-lg px-3 py-2 text-left text-sm text-[var(--app-text)] transition hover:bg-[var(--app-surface-soft)]"
+                  >
+                    <Settings className="h-4 w-4" />
                     Settings
-                  </Link>
-                  {isSignedIn ? (
-                    <button
-                      type="button"
-                      onClick={handleLogout}
-                      className="block w-full rounded-md px-3 py-2 text-left text-sm text-[var(--app-danger)] hover:bg-[var(--app-danger-soft)]"
-                    >
-                      Sign out
-                    </button>
-                  ) : null}
+                  </button>
+                  <div className="my-2 border-t border-[var(--app-border)]" />
+                  <button
+                    type="button"
+                    onClick={handleSignOutRequest}
+                    className="flex w-full items-center justify-center gap-2 rounded-lg border border-[var(--app-border)] bg-[var(--app-surface-elevated)] px-3 py-2 text-sm text-[var(--app-text)] transition hover:bg-[var(--app-surface-soft)]"
+                  >
+                    <LogOut className="h-4 w-4" />
+                    Sign out
+                  </button>
                 </div>
               ) : null}
 
@@ -260,31 +350,25 @@ export default function AppShell({ children }: PropsWithChildren) {
         </aside>
 
         <div className="min-w-0 flex-1">
-          <header className="sticky top-0 z-30 border-b border-[var(--app-border)] bg-[var(--app-surface)]/95 px-4 py-3 backdrop-blur sm:px-6 lg:px-8">
-            <div className="flex items-center justify-between gap-2">
-              <div className="flex items-center gap-2">
-                <Button variant="secondary" size="icon" className="lg:hidden" onClick={() => setMobileOpen((prev) => !prev)}>
-                  <Menu className="h-4 w-4" />
-                </Button>
-                <Button variant="secondary" size="icon" className="hidden lg:inline-flex" onClick={() => setDesktopSidebarCollapsed((prev) => !prev)}>
-                  <PanelLeft className="h-4 w-4" />
-                </Button>
-                <div>
-                  <p className="text-xs uppercase tracking-wide text-[var(--app-subtle)]">Recruiter Console</p>
-                  <p className="text-sm font-semibold">Hiring Command Center</p>
-                </div>
-              </div>
-              <Button asChild variant="secondary" size="icon">
-                <Link href="/settings" aria-label="Open settings">
-                  <Settings className="h-4 w-4" />
-                </Link>
-              </Button>
-            </div>
-          </header>
-
           <main className="px-4 pb-10 pt-8 sm:px-6 lg:px-8">{children}</main>
         </div>
       </div>
+
+      <ProfileTabsModal isOpen={isProfileOpen} onClose={() => setIsProfileOpen(false)} />
+
+      <ConfirmModal
+        isOpen={isSignOutConfirmOpen}
+        onClose={() => setIsSignOutConfirmOpen(false)}
+        onConfirm={handleLogout}
+        title="Sign out?"
+        message="You will be logged out from this workspace on this browser."
+        confirmLabel="Sign out"
+        confirmIcon={<LogOut className="h-4 w-4" />}
+      />
+
+      <AppModal isOpen={isSettingsOpen} onClose={() => setIsSettingsOpen(false)} title="Settings">
+        <SettingsModalContent onClose={() => setIsSettingsOpen(false)} />
+      </AppModal>
     </div>
   );
 }

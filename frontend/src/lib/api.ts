@@ -31,10 +31,14 @@ const getApiClient = () => {
     (response) => response,
     (error: AxiosError) => {
       if (error.response?.status === 401 && typeof window !== 'undefined') {
-        clearStoredAuth();
-        const next = encodeURIComponent(window.location.pathname || '/');
-        if (!window.location.pathname.startsWith('/login')) {
-          window.location.href = `/login?next=${next}`;
+        const hasTempDashboardAccess = window.localStorage.getItem('temp_dashboard_access') === '1';
+
+        if (!hasTempDashboardAccess) {
+          clearStoredAuth();
+          const next = encodeURIComponent(window.location.pathname || '/');
+          if (!window.location.pathname.startsWith('/login')) {
+            window.location.href = `/login?next=${next}`;
+          }
         }
       }
 
