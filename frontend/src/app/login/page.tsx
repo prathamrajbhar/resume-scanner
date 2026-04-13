@@ -4,7 +4,7 @@ import Image from 'next/image';
 import { Suspense, useEffect, useMemo, useState } from 'react';
 import type { CredentialResponse } from '@react-oauth/google';
 import { googleLogin } from '@/lib/api';
-import { getStoredToken, getStoredUser, setStoredToken, setStoredUser } from '@/lib/storage';
+import { getStoredToken, getStoredUser, setProfileSetupRequired, setStoredToken, setStoredUser } from '@/lib/storage';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { GoogleButton } from '@/components/auth/google-button';
 
@@ -27,6 +27,19 @@ function LoginContent() {
   const nextPath = useMemo(() => resolveNextPath(searchParams.get('next')), [searchParams]);
 
   useEffect(() => {
+    if (typeof window !== 'undefined') {
+      const { protocol, hostname, pathname, search, hash } = window.location;
+      const isCanonicalLocalhost = protocol === 'http:' && hostname === 'localhost';
+
+      // Google OAuth JavaScript origins are usually configured for localhost in dev.
+      // Redirect from LAN/127 hosts to avoid origin_mismatch failures.
+      if (!isCanonicalLocalhost) {
+        const redirectUrl = `http://localhost:3000${pathname}${search}${hash}`;
+        window.location.replace(redirectUrl);
+        return;
+      }
+    }
+
     const hasSession = Boolean(getStoredToken() && getStoredUser()?.email);
     if (hasSession) {
       router.replace(nextPath);
@@ -46,8 +59,14 @@ function LoginContent() {
         id_token: credentialResponse.credential,
       });
 
+      const userForStorage = response.is_new_user
+        ? { ...response.user, full_name: null }
+        : response.user;
+
       setStoredToken(response.access_token);
-      setStoredUser(response.user);
+      setStoredUser(userForStorage);
+      const missingName = !userForStorage.full_name || userForStorage.full_name.trim().length === 0;
+      setProfileSetupRequired(Boolean(response.is_new_user || missingName));
       router.replace(nextPath);
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Login failed');
@@ -84,7 +103,10 @@ function LoginContent() {
             loading={loading}
             disabled={!GOOGLE_CLIENT_ID}
             onSuccess={handleGoogleSuccess}
-            onError={() => setError('Invalid Google token')}
+            onError={() => {
+              const origin = typeof window !== 'undefined' ? window.location.origin : 'unknown-origin';
+              setError(`Google sign-in failed for origin ${origin}. Use http://localhost:3000 or add this origin in Google Cloud OAuth settings.`);
+            }}
           />
 
           <div className="flex items-center gap-2 text-xs font-medium uppercase tracking-wide text-subtle">

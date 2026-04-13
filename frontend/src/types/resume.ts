@@ -15,6 +15,7 @@ export interface AuthResponse {
   access_token: string;
   token_type: string;
   user: User;
+  is_new_user?: boolean;
 }
 
 export interface ResumeUploadResponse {
@@ -53,6 +54,17 @@ export interface Candidate {
   phone: string | null;
   location: string | null;
   skills: string[];
+  matched_roles?: string[];
+  shortlisted_roles?: string[];
+  shortlist_entries?: Array<{
+    role_id: string;
+    role_title?: string | null;
+    selected_by?: string | null;
+    selection_type?: string | null;
+    created_at?: string | null;
+  }>;
+  is_shortlisted?: boolean;
+  selected_type?: string | null;
   total_experience: number | null;
   education: string | null;
 }

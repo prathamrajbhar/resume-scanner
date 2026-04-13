@@ -3,7 +3,7 @@
 import Image from 'next/image';
 import Link from 'next/link';
 import { usePathname, useRouter } from 'next/navigation';
-import { PropsWithChildren, useEffect, useMemo, useRef, useState } from 'react';
+import { PropsWithChildren, useEffect, useRef, useState } from 'react';
 import {
   BarChart3,
   Bot,
@@ -17,9 +17,9 @@ import {
   X,
   Users,
 } from 'lucide-react';
+import { useMe } from '@/lib/hooks';
 import { ConfirmModal } from '@/components/chat/confirm-modal';
-import { applyStoredTheme, clearStoredAuth, getStoredToken, getStoredUser } from '@/lib/storage';
-import { User } from '@/types/resume';
+import { applyStoredTheme, clearStoredAuth, consumeProfileSetupRequired, getStoredToken } from '@/lib/storage';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { AppModal } from '@/components/ui/app-modal';
 import { Badge } from '@/components/ui/badge';
@@ -41,8 +41,7 @@ const navItems = [
 export default function AppShell({ children }: PropsWithChildren) {
   const router = useRouter();
   const pathname = usePathname();
-  const [currentUser, setCurrentUser] = useState<User | null>(null);
-  const [hasToken, setHasToken] = useState(false);
+  
   const [hasTempDashboardAccess, setHasTempDashboardAccess] = useState(false);
   const [authHydrated, setAuthHydrated] = useState(false);
   const [desktopSidebarCollapsed, setDesktopSidebarCollapsed] = useState(false);
@@ -55,9 +54,10 @@ export default function AppShell({ children }: PropsWithChildren) {
   const isPublicRoute = pathname === '/login';
   const isChatFocusRoute = pathname.startsWith('/chatbase');
 
+  const { data: currentUser, isSuccess: isAuthLoaded } = useMe();
+  const hasToken = !!getStoredToken();
+
   const hydrateAuth = () => {
-    setCurrentUser(getStoredUser());
-    setHasToken(Boolean(getStoredToken()));
     if (typeof window !== 'undefined') {
       setHasTempDashboardAccess(window.localStorage.getItem('temp_dashboard_access') === '1');
     }
@@ -94,6 +94,7 @@ export default function AppShell({ children }: PropsWithChildren) {
   const needsAuthRedirect =
     !isPublicRoute &&
     authHydrated &&
+    isAuthLoaded &&
     !(hasTempDashboardAccess || hasTempAccessFromStorage) &&
     (!hasToken || !currentUser?.email);
 
@@ -132,7 +133,19 @@ export default function AppShell({ children }: PropsWithChildren) {
     };
   }, [profileMenuOpen]);
 
-  const userInitials = useMemo(() => {
+  useEffect(() => {
+    if (!authHydrated || !isAuthLoaded || !hasToken || !currentUser?.email) {
+      return;
+    }
+
+    const shouldOpenProfile = consumeProfileSetupRequired() || !currentUser.full_name?.trim();
+    if (shouldOpenProfile) {
+      setProfileMenuOpen(false);
+      setIsProfileOpen(true);
+    }
+  }, [authHydrated, isAuthLoaded, hasToken, currentUser?.email, currentUser?.full_name]);
+
+  const userInitials = () => {
     if (!currentUser?.full_name) {
       return 'HR';
     }
@@ -142,7 +155,7 @@ export default function AppShell({ children }: PropsWithChildren) {
       .map((part) => part.charAt(0).toUpperCase())
       .slice(0, 2)
       .join('');
-  }, [currentUser]);
+  };
 
   const isSignedIn = Boolean(currentUser?.email && hasToken);
   const compactDesktop = desktopSidebarCollapsed;
@@ -280,17 +293,7 @@ export default function AppShell({ children }: PropsWithChildren) {
                   'dropdown-pop absolute bottom-[calc(100%+10px)] z-20 w-full rounded-2xl border border-[var(--app-border)] bg-[var(--app-surface-elevated)] p-4 shadow-[var(--app-shadow-md)] transition duration-200 hover:scale-[1.02]',
                   compactDesktop && 'lg:left-full lg:ml-3 lg:w-[304px]'
                 )}>
-                  <div className="flex items-center gap-3 rounded-xl bg-gradient-to-r from-blue-50 to-indigo-50 p-3">
-                    <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-blue-500 text-sm font-semibold text-white">
-                      {userInitials}
-                    </div>
-                    <div className="min-w-0">
-                      <p className="truncate text-sm font-semibold text-[var(--app-text)]">{currentUser?.full_name || 'Name unavailable'}</p>
-                      <p className="truncate text-xs text-[var(--app-muted)]">{currentUser?.email || 'Email unavailable'}</p>
-                    </div>
-                  </div>
-
-                  <div className="my-2 border-t border-[var(--app-border)]" />
+                  <p className="px-1 pb-2 text-xs font-medium uppercase tracking-wide text-[var(--app-muted)]">Account</p>
 
                   <button
                     type="button"
@@ -336,8 +339,11 @@ export default function AppShell({ children }: PropsWithChildren) {
               >
                 <div className={cn('flex items-center gap-2.5', compactDesktop && 'lg:justify-center')}>
                   <Avatar>
-                    {currentUser?.avatar_url ? <AvatarImage src={currentUser.avatar_url} alt={currentUser.full_name || 'User'} /> : null}
-                    <AvatarFallback>{userInitials}</AvatarFallback>
+                    {currentUser?.avatar_url ? (
+                      <AvatarImage src={currentUser.avatar_url} alt={currentUser.full_name || 'User'} />
+                    ) : (
+                      <AvatarFallback>{userInitials()}</AvatarFallback>
+                    )}
                   </Avatar>
                   <div className={cn('min-w-0', compactDesktop && 'lg:hidden')}>
                     <p className="truncate text-sm font-medium">{currentUser?.full_name || 'Guest recruiter'}</p>

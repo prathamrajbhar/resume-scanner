@@ -3,11 +3,13 @@
 import { FormEvent, useEffect, useMemo, useRef, useState } from 'react';
 import { ChevronDown, Plus, Search } from 'lucide-react';
 import { SKILLS, SkillLevel, SkillLevels } from '@/data/skills';
+import { createSkill, getSkills } from '@/lib/api';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import { SkillLevelCard } from '@/components/job-roles/skill-level-card';
 import { SkillAddModal } from '@/components/job-roles/skill-add-modal';
+import { useTopToast } from '@/components/ui/top-toast';
 
 export interface JobRoleSkill {
   name: string;
@@ -26,17 +28,35 @@ interface JobRoleFormProps {
 }
 
 export function JobRoleForm({ onCreateRole }: JobRoleFormProps) {
+  const { showToast } = useTopToast();
   const GLOBAL_SKILLS_KEY = 'resume_scanner_global_custom_skills';
   const [title, setTitle] = useState('');
   const [description, setDescription] = useState('');
   const [skillSearch, setSkillSearch] = useState('');
   const [skillLevels, setSkillLevels] = useState<SkillLevels>({});
   const [customSkills, setCustomSkills] = useState<string[]>([]);
+  const [dbSkills, setDbSkills] = useState<string[]>([]);
   const [showAddSkillModal, setShowAddSkillModal] = useState(false);
   const [showAddedToast, setShowAddedToast] = useState(false);
   const skillsContainerRef = useRef<HTMLDivElement | null>(null);
 
-  const allSkills = useMemo(() => [...SKILLS, ...customSkills], [customSkills]);
+  const allSkills = useMemo(() => Array.from(new Set([...SKILLS, ...dbSkills, ...customSkills])), [customSkills, dbSkills]);
+
+  useEffect(() => {
+    const loadSkills = async () => {
+      try {
+        const skills = await getSkills();
+        const names = Array.isArray(skills)
+          ? skills.map((skill: { name?: string }) => skill?.name).filter((name): name is string => Boolean(name && name.trim()))
+          : [];
+        setDbSkills(names);
+      } catch {
+        // Keep defaults/local skills if backend list is unavailable.
+      }
+    };
+
+    void loadSkills();
+  }, []);
 
   useEffect(() => {
     if (typeof window === 'undefined') {
@@ -106,6 +126,14 @@ export function JobRoleForm({ onCreateRole }: JobRoleFormProps) {
       .filter(([, level]) => level > 0)
       .map(([name, level]) => ({ name, level }));
 
+    if (skills.length === 0) {
+      showToast({
+        message: 'Please select at least one skill.',
+        tone: 'error',
+      });
+      return;
+    }
+
     onCreateRole({
       title: normalizedTitle,
       description: normalizedDescription,
@@ -119,7 +147,7 @@ export function JobRoleForm({ onCreateRole }: JobRoleFormProps) {
     setShowAddSkillModal(false);
   };
 
-  const handleAddSkillFromModal = ({
+  const handleAddSkillFromModal = async ({
     name,
     level,
     makeGlobal,
@@ -128,6 +156,17 @@ export function JobRoleForm({ onCreateRole }: JobRoleFormProps) {
     level: SkillLevel;
     makeGlobal: boolean;
   }) => {
+    try {
+      await createSkill({
+        name,
+        is_global: makeGlobal,
+      });
+
+      setDbSkills((prev) => (prev.includes(name) ? prev : [...prev, name]));
+    } catch {
+      // Fall back to local-only behavior if API save fails.
+    }
+
     setCustomSkills((prev) => {
       const next = [...prev, name];
 

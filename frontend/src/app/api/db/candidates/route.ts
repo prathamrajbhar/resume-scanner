@@ -1,5 +1,7 @@
 import { NextResponse } from 'next/server';
-import { prisma } from '@/lib/prisma';
+
+const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000';
+const TOKEN_COOKIE_KEY = 'resume_scanner_token';
 
 const toStringArray = (value: unknown): string[] => {
   if (!Array.isArray(value)) {
@@ -9,17 +11,81 @@ const toStringArray = (value: unknown): string[] => {
   return value.filter((item): item is string => typeof item === 'string');
 };
 
-export async function GET() {
+const readTokenFromCookieHeader = (cookieHeader: string | null): string | null => {
+  if (!cookieHeader) {
+    return null;
+  }
+
+  const cookies = cookieHeader.split(';');
+  for (const rawCookie of cookies) {
+    const [name, ...rest] = rawCookie.trim().split('=');
+    if (name !== TOKEN_COOKIE_KEY) {
+      continue;
+    }
+
+    const encoded = rest.join('=');
+    if (!encoded) {
+      return null;
+    }
+
+    try {
+      return decodeURIComponent(encoded);
+    } catch {
+      return encoded;
+    }
+  }
+
+  return null;
+};
+
+export async function GET(request: Request) {
   try {
-    const candidates = await prisma.candidate.findMany({
-      orderBy: {
-        full_name: 'asc',
+    const token = readTokenFromCookieHeader(request.headers.get('cookie'));
+    if (!token) {
+      return NextResponse.json([], { status: 200 });
+    }
+
+    const requestUrl = new URL(request.url);
+    const roleId = requestUrl.searchParams.get('role_id');
+    const shortlisted = requestUrl.searchParams.get('shortlisted');
+    const searchParams = new URLSearchParams();
+    if (roleId) {
+      searchParams.set('role_id', roleId);
+    }
+    if (shortlisted) {
+      searchParams.set('shortlisted', shortlisted);
+    }
+    const query = searchParams.toString() ? `?${searchParams.toString()}` : '';
+
+    const upstream = await fetch(`${API_BASE_URL}/api/candidates${query}`, {
+      method: 'GET',
+      headers: {
+        Authorization: `Bearer ${token}`,
       },
+      cache: 'no-store',
     });
 
-    const normalized = candidates.map((candidate: { skills: unknown } & Record<string, unknown>) => ({
+    if (!upstream.ok) {
+      const detail = await upstream.text();
+      return NextResponse.json(
+        { detail: detail || 'Failed to fetch candidates from backend' },
+        { status: upstream.status }
+      );
+    }
+
+    const candidates = (await upstream.json()) as Array<{
+      skills?: unknown;
+      matched_roles?: unknown;
+      shortlisted_roles?: unknown;
+      shortlist_entries?: unknown;
+    } & Record<string, unknown>>;
+
+    const normalized = candidates.map((candidate) => ({
       ...candidate,
       skills: toStringArray(candidate.skills),
+      matched_roles: toStringArray(candidate.matched_roles),
+      shortlisted_roles: toStringArray(candidate.shortlisted_roles),
+      shortlist_entries: Array.isArray(candidate.shortlist_entries) ? candidate.shortlist_entries : [],
     }));
 
     return NextResponse.json(normalized, { status: 200 });

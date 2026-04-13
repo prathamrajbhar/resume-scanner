@@ -3,12 +3,14 @@ from app.api.dependencies import get_current_user
 from app.db.session import get_db
 from app.schemas.api import GoogleLoginRequest
 from app.core.security import create_access_token
+from app.services.auth_mailer import send_auth_activity_email
 from google.oauth2 import id_token
 from google.auth.transport import requests
 from app.db.prisma_client import Prisma
 import os
 
 router = APIRouter()
+GOOGLE_TOKEN_CLOCK_SKEW_SECONDS = int(os.getenv("GOOGLE_TOKEN_CLOCK_SKEW_SECONDS", "30"))
 
 
 def _split_client_ids(raw_value: str) -> list[str]:
@@ -31,6 +33,58 @@ def _get_google_client_ids() -> list[str]:
     return list(dict.fromkeys(configured_ids))
 
 
+def _token_target_matches(idinfo: dict, google_client_ids: list[str]) -> bool:
+    aud = idinfo.get("aud")
+    azp = idinfo.get("azp")
+
+    aud_values: list[str] = []
+    if isinstance(aud, str):
+        aud_values = [aud]
+    elif isinstance(aud, list):
+        aud_values = [value for value in aud if isinstance(value, str)]
+
+    token_targets = set(aud_values)
+    if isinstance(azp, str):
+        token_targets.add(azp)
+
+    return bool(token_targets.intersection(set(google_client_ids)))
+
+
+def _verify_google_id_token(token: str, google_client_ids: list[str]) -> dict:
+    req = requests.Request()
+    last_error: ValueError | None = None
+
+    # Preferred path: verify against each configured audience directly.
+    for client_id in google_client_ids:
+        try:
+            return id_token.verify_oauth2_token(
+                token,
+                req,
+                client_id,
+                clock_skew_in_seconds=GOOGLE_TOKEN_CLOCK_SKEW_SECONDS,
+            )
+        except ValueError as exc:
+            last_error = exc
+
+    # Fallback path for tokens where aud/azp combinations differ by OAuth flow.
+    try:
+        idinfo = id_token.verify_oauth2_token(
+            token,
+            req,
+            None,
+            clock_skew_in_seconds=GOOGLE_TOKEN_CLOCK_SKEW_SECONDS,
+        )
+    except ValueError:
+        if last_error:
+            raise last_error
+        raise
+
+    if not _token_target_matches(idinfo, google_client_ids):
+        raise ValueError("google_client_id_mismatch")
+
+    return idinfo
+
+
 @router.get("/me")
 async def me(current_user=Depends(get_current_user)):
     return current_user
@@ -51,18 +105,8 @@ async def google_login(
         )
 
     try:
-        # 1. Verify ID Token
-        # Using Google's library to verify the integrity and clock skew
-        idinfo = id_token.verify_oauth2_token(
-            request.id_token,
-            requests.Request(),
-            None,
-        )
-
-        token_aud = idinfo.get("aud")
-        token_azp = idinfo.get("azp")
-        if token_aud not in google_client_ids and token_azp not in google_client_ids:
-            raise ValueError("google_client_id_mismatch")
+        # 1. Verify ID Token against configured Google OAuth client IDs.
+        idinfo = _verify_google_id_token(request.id_token, google_client_ids)
 
         # ID token is valid. Get the user's Google Account ID from the decoded token.
         email = idinfo['email']
@@ -72,21 +116,23 @@ async def google_login(
 
         # 2. Upsert User in Database
         user = await db.user.find_unique(where={'email': email})
+        is_new_user = False
         if not user:
+            is_new_user = True
             user = await db.user.create(
                 data={
                     "email": email,
-                    "full_name": full_name,
+                    # Keep profile name empty for first-time onboarding flow.
+                    "full_name": None,
                     "avatar_url": avatar_url,
                     "google_id": google_id
                 }
             )
         else:
-            # Update user information from the latest Google profile
+            # Refresh Google identity metadata, but keep HR-managed profile name.
             user = await db.user.update(
                 where={'email': email},
                 data={
-                    "full_name": full_name,
                     "avatar_url": avatar_url,
                     "google_id": google_id
                 }
@@ -95,16 +141,25 @@ async def google_login(
         # 3. Create real JWT Access Token
         access_token = create_access_token(subject=user.id)
 
+        # Send registration confirmation email only for new users
+        if is_new_user:
+            await send_auth_activity_email(
+                to_email=email,
+                full_name=user.full_name,
+                event_type="register",
+            )
+
         return {
             "access_token": access_token,
             "token_type": "bearer",
-            "user": user
+            "user": user,
+            "is_new_user": is_new_user,
         }
-    except ValueError:
+    except ValueError as exc:
         # Invalid token
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Invalid Google token or client ID mismatch",
+            detail=f"Invalid Google token or client ID mismatch: {str(exc)}",
         )
     except Exception as e:
         raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail=f"Authentication error: {str(e)}")

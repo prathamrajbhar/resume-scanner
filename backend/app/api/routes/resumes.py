@@ -1,63 +1,50 @@
 from fastapi import APIRouter, Depends, HTTPException, UploadFile, File
 from app.api.dependencies import get_current_user
 from app.db.session import get_db
-from app.services.google_drive import GoogleDriveService
-from app.services.nlp_service import NLPService
 from app.db.prisma_client import Prisma
+from app.schemas.api import ResumeSimple
+from app.services.nlp_service import NLPService
+from typing import List
+from prisma import Json
 
 router = APIRouter()
-drive_service = GoogleDriveService()
 nlp_service = NLPService()
 
-@router.post("/upload")
+@router.post("/upload", response_model=ResumeSimple)
 async def upload_resume(
     file: UploadFile = File(...),
-    current_user=Depends(get_current_user),
+    current_user = Depends(get_current_user),
     db: Prisma = Depends(get_db)
 ):
     """
-    Handles PDF/DOC resume upload, extraction, and storage in GDrive & DB.
+    Handles resume upload, extraction, and storage in DB.
     """
     try:
         content = await file.read()
-        filename = file.filename
+
+        extracted = nlp_service.extract_text_from_bytes(content, file.filename or "uploaded_resume")
+        content_text = extracted or f"Extracted text from {file.filename}"
+        parsed_profile = nlp_service.extract_candidate_profile(content_text, file.filename or "uploaded_resume")
         
-        # 1. Extract Text
-        extracted_text = nlp_service.extract_text_from_bytes(content, filename)
-        if not extracted_text:
-            raise HTTPException(status_code=400, detail="Failed to extract text from resume")
-            
-        # 2. Upload to GDrive
-        drive_id = drive_service.upload_file(content, filename, file.content_type)
-        if not drive_id:
-            drive_id = "placeholder_id"  # For local dev if no creds
-            
-        # 3. Create Candidate & Resume Record
-        candidate_name = filename.replace('.pdf', '').replace('_', ' ').title()
-        
-        candidate = await db.candidate.create(
+        resume = await db.resume.create(
             data={
-                "full_name": candidate_name,
-                "skills": list(nlp_service.extract_skills(extracted_text))
+                "file_name": file.filename or "uploaded_resume",
+                "content_text": content_text,
+                "parsed_data": Json(parsed_profile),
+                "uploaded_by": current_user.id,
             }
         )
-        
-        # We don't need to return the resume record, just create it
-        await db.resume.create(
-            data={
-                "candidate_id": candidate.id,
-                "drive_file_id": drive_id,
-                "original_filename": filename,
-                "content_text": extracted_text
-            }
-        )
-        
-        return {
-            "id": candidate.id,
-            "name": candidate.full_name,
-            "filename": filename,
-            "drive_id": drive_id
-        }
+        return resume
         
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Error uploading resume: {str(e)}")
+
+@router.get("/", response_model=List[ResumeSimple])
+async def get_resumes(
+    current_user = Depends(get_current_user),
+    db: Prisma = Depends(get_db)
+):
+    return await db.resume.find_many(
+        where={"uploaded_by": current_user.id}, 
+        order={"created_at": "desc"}
+    )

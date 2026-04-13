@@ -14,7 +14,7 @@ type SkillAddModalSubmit = {
 type SkillAddModalProps = {
   isOpen: boolean;
   onClose: () => void;
-  onSubmit: (payload: SkillAddModalSubmit) => void;
+  onSubmit: (payload: SkillAddModalSubmit) => Promise<void> | void;
   existingSkills: string[];
 };
 
@@ -57,7 +57,7 @@ export function SkillAddModal({ isOpen, onClose, onSubmit, existingSkills }: Ski
     }
   }, [isOpen]);
 
-  const handleSubmit = () => {
+  const handleSubmit = async () => {
     const trimmed = name.trim();
     if (!trimmed) {
       setError('Enter a skill name.');
@@ -70,17 +70,17 @@ export function SkillAddModal({ isOpen, onClose, onSubmit, existingSkills }: Ski
       return;
     }
 
-    onSubmit({
+    await onSubmit({
       name: trimmed,
       level,
       makeGlobal,
     });
   };
 
-  const handleEnterSubmit = (event: KeyboardEvent<HTMLInputElement>) => {
+  const handleEnterSubmit = async (event: KeyboardEvent<HTMLInputElement>) => {
     if (event.key === 'Enter') {
       event.preventDefault();
-      handleSubmit();
+      await handleSubmit();
     }
   };
 

@@ -4,7 +4,8 @@ import Link from 'next/link';
 import { useEffect, useMemo, useState } from 'react';
 import { ArrowRight, BriefcaseBusiness, Sparkles, Users } from 'lucide-react';
 import StatCard from '@/components/stat-card';
-import { getCandidates } from '@/lib/api';
+import { getCandidates, getMe } from '@/lib/api';
+import { getStoredUser } from '@/lib/storage';
 import { Candidate } from '@/types/resume';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -13,8 +14,31 @@ import { Separator } from '@/components/ui/separator';
 
 export default function Home() {
   const [candidates, setCandidates] = useState<Candidate[]>([]);
+  const [hrFirstName, setHrFirstName] = useState<string>('');
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+
+  const deriveFirstName = (fullName: string | null | undefined) => {
+    if (!fullName) {
+      return '';
+    }
+
+    const first = fullName.trim().split(/\s+/)[0] || '';
+    return first;
+  };
+
+  const getTimeGreeting = () => {
+    const hour = new Date().getHours();
+    if (hour < 12) {
+      return 'Good morning';
+    }
+    if (hour < 18) {
+      return 'Good afternoon';
+    }
+    return 'Good evening';
+  };
+
+  const greetingLabel = hrFirstName ? `${getTimeGreeting()},` : 'Welcome';
 
   useEffect(() => {
     const loadCandidates = async () => {
@@ -31,6 +55,32 @@ export default function Home() {
     };
 
     void loadCandidates();
+  }, []);
+
+  useEffect(() => {
+    const storedUser = getStoredUser();
+    setHrFirstName(deriveFirstName(storedUser?.full_name));
+
+    const syncUser = async () => {
+      try {
+        const me = await getMe();
+        setHrFirstName(deriveFirstName(me?.full_name));
+      } catch {
+        // Keep stored user fallback when profile fetch fails.
+      }
+    };
+
+    const onUserUpdated = () => {
+      const nextUser = getStoredUser();
+      setHrFirstName(deriveFirstName(nextUser?.full_name));
+    };
+
+    window.addEventListener('resume:user-updated', onUserUpdated);
+    void syncUser();
+
+    return () => {
+      window.removeEventListener('resume:user-updated', onUserUpdated);
+    };
   }, []);
 
   const stats = useMemo(() => {
@@ -52,7 +102,9 @@ export default function Home() {
         <CardContent className="rounded-2xl border border-[var(--app-border)] bg-[var(--app-surface)] p-8 md:p-10">
           <div className="grid gap-8 lg:grid-cols-[1.4fr_0.8fr]">
             <div>
-              <Badge>Recruiting Workspace</Badge>
+              <div className="text-lg font-semibold text-[var(--app-text)]">
+                👋 {greetingLabel} {hrFirstName ? <span>{hrFirstName}</span> : null}
+              </div>
               <h1 className="mt-4 max-w-2xl font-display text-4xl font-semibold leading-tight md:text-5xl">
                 Production-ready hiring control center for screening and ranking.
               </h1>

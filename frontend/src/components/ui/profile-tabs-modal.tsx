@@ -4,12 +4,16 @@ import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { Trash2, X } from 'lucide-react';
 import { ConfirmModal } from '@/components/chat/confirm-modal';
+import { useTopToast } from '@/components/ui/top-toast';
+import { deleteAccount, updateProfile } from '@/lib/api';
 import {
   applyStoredTheme,
   clearStoredAuth,
   clearStoredChats,
+  setProfileSetupRequired,
   defaultSettings,
   getStoredUser,
+  setStoredUser,
   setStoredSettings,
 } from '@/lib/storage';
 
@@ -22,12 +26,24 @@ type ProfileTabsModalProps = {
 
 export function ProfileTabsModal({ isOpen, onClose }: ProfileTabsModalProps) {
   const router = useRouter();
+  const { showToast } = useTopToast();
   const [activeTab, setActiveTab] = useState<ProfileTab>('account');
   const [isDeleteAccountConfirmOpen, setIsDeleteAccountConfirmOpen] = useState(false);
+  const [isDeletingAccount, setIsDeletingAccount] = useState(false);
+  const [name, setName] = useState('');
+  const [status, setStatus] = useState<string | null>(null);
 
   const user = getStoredUser();
-  const name = user?.full_name || 'Name unavailable';
   const email = user?.email || 'Email unavailable';
+
+  useEffect(() => {
+    if (!isOpen) {
+      return;
+    }
+
+    setName(user?.full_name || '');
+    setStatus(null);
+  }, [isOpen, user?.full_name]);
 
   useEffect(() => {
     if (!isOpen) {
@@ -62,16 +78,76 @@ export function ProfileTabsModal({ isOpen, onClose }: ProfileTabsModalProps) {
     return null;
   }
 
-  const confirmDeleteAccount = () => {
-    clearStoredChats();
-    clearStoredAuth();
-    if (typeof window !== 'undefined') {
-      window.localStorage.removeItem('temp_dashboard_access');
+  const handleSaveName = async () => {
+    const nextName = name.trim();
+
+    if (!nextName) {
+      setStatus('Name is required.');
+      return;
     }
 
-    setIsDeleteAccountConfirmOpen(false);
-    onClose();
-    router.replace('/login');
+    if (!user) {
+      setStatus('Unable to update profile right now.');
+      return;
+    }
+
+    try {
+      setStatus(null);
+      const isFirstTimeProfileSetup = !user.full_name || user.full_name.trim().length === 0;
+      
+      // Call API to save name to database
+      const updatedUser = await updateProfile(nextName);
+      
+      // Update localStorage with the database response
+      setStoredUser(updatedUser);
+      setProfileSetupRequired(false);
+
+      if (isFirstTimeProfileSetup) {
+        showToast({
+          message: `Welcome ${nextName} to HR Copilot`,
+          tone: 'welcome',
+          durationMs: 3600,
+        });
+        onClose();
+        return;
+      }
+
+      setStatus('Name updated successfully.');
+      showToast({
+        message: `Profile updated for ${nextName}`,
+        tone: 'success',
+        durationMs: 2200,
+      });
+    } catch (error) {
+      setStatus(error instanceof Error ? error.message : 'Failed to update profile.');
+    }
+  };
+
+  const confirmDeleteAccount = async () => {
+    if (isDeletingAccount) {
+      return;
+    }
+
+    setIsDeletingAccount(true);
+    setStatus(null);
+
+    try {
+      await deleteAccount();
+      clearStoredChats();
+      clearStoredAuth();
+      if (typeof window !== 'undefined') {
+        window.localStorage.removeItem('temp_dashboard_access');
+      }
+
+      setIsDeleteAccountConfirmOpen(false);
+      onClose();
+      router.replace('/login');
+    } catch (error) {
+      setStatus(error instanceof Error ? error.message : 'Failed to delete account. Please try again.');
+      setIsDeleteAccountConfirmOpen(false);
+    } finally {
+      setIsDeletingAccount(false);
+    }
   };
 
   const handleClearChatHistory = () => {
@@ -152,16 +228,34 @@ export function ProfileTabsModal({ isOpen, onClose }: ProfileTabsModalProps) {
               <div className="space-y-6">
                 <h3 className="text-xl font-semibold text-gray-900">Account</h3>
 
-                <div className="space-y-1">
-                  <div className="flex justify-between items-center border-b border-gray-200 py-3">
-                    <span className="text-sm text-gray-500">Name</span>
-                    <span className="text-sm text-gray-800">{name}</span>
-                  </div>
-                  <div className="flex justify-between items-center border-b border-gray-200 py-3">
-                    <span className="text-sm text-gray-500">Email</span>
-                    <span className="text-sm text-gray-800">{email}</span>
+                <div className="grid grid-cols-[120px_1fr] items-center gap-x-6 gap-y-4">
+                  <label htmlFor="profile-name" className="text-gray-600 text-sm">
+                    Name
+                  </label>
+                  <input
+                    id="profile-name"
+                    value={name}
+                    onChange={(event) => setName(event.target.value)}
+                    className="w-full rounded-lg border border-gray-300 px-4 py-2 text-sm text-gray-800 focus:ring-2 focus:ring-blue-500"
+                    placeholder="Firstname lastname like vice"
+                  />
+
+                  <label className="text-gray-600 text-sm">Email</label>
+                  <p className="text-gray-800 text-sm">{email}</p>
+
+                  <div />
+                  <div className="col-start-2">
+                    <button
+                      type="button"
+                      onClick={handleSaveName}
+                      className="rounded-lg bg-blue-600 px-4 py-2 text-white hover:bg-blue-700"
+                    >
+                      Save name
+                    </button>
                   </div>
                 </div>
+
+                {status ? <p className="text-sm text-gray-600">{status}</p> : null}
 
                 <div>
                   <p className="text-lg font-medium text-gray-900">Delete account</p>

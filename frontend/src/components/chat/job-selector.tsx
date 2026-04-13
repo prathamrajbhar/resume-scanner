@@ -1,6 +1,6 @@
 interface JobSelectorProps {
   selectedJob: string;
-  roles: string[];
+  roles: Array<{ id: string; title: string }>;
   onChange: (value: string) => void;
 }
 
@@ -18,8 +18,8 @@ export function JobSelector({ selectedJob, roles, onChange }: JobSelectorProps) 
       >
         <option value="">Choose a role...</option>
         {roles.map((role) => (
-          <option key={role} value={role}>
-            {role}
+          <option key={role.id} value={role.id}>
+            {role.title}
           </option>
         ))}
       </select>

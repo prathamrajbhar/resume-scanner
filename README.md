@@ -28,6 +28,20 @@ A production-ready AI-powered HR application with a ChatGPT-style interface for 
     cd backend
     ```
 2.  **Create a `.env` file** (if you haven't already) based on the template.
+    Add these values in `backend/.env` to send login/register notification emails to the HR account:
+    ```env
+    AUTH_EMAIL_NOTIFICATIONS_ENABLED=true
+    SMTP_HOST=smtp.gmail.com
+    SMTP_PORT=587
+    SMTP_USERNAME=your-gmail@gmail.com
+    SMTP_PASSWORD=your-16-digit-gmail-app-password
+    SMTP_FROM_EMAIL=your-gmail@gmail.com
+    SMTP_FROM_NAME=AI HR Copilot
+    ```
+    Gmail setup notes:
+    - Enable 2-Step Verification on the sender Gmail account.
+    - Generate an App Password from Google Account -> Security -> App passwords.
+    - Put that 16-character App Password in `SMTP_PASSWORD`.
 3.  **Install dependencies**:
     ```bash
     pip install -r requirements.txt

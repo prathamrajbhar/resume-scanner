@@ -2,57 +2,36 @@
 
 import Link from 'next/link';
 import { useParams } from 'next/navigation';
-import { useEffect, useState } from 'react';
 import { GraduationCap, Mail, MapPin, Phone } from 'lucide-react';
-import { getCandidateById } from '@/lib/api';
-import { Candidate } from '@/types/resume';
+import { useCandidate } from '@/lib/hooks';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 
 export default function CandidateDetailPage() {
   const params = useParams<{ candidateId: string }>();
-  const candidateId = params.candidateId;
+  const id = params?.candidateId;
 
-  const [candidate, setCandidate] = useState<Candidate | null>(null);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
+  const { data: candidate, isLoading, error } = useCandidate(id || '');
 
-  useEffect(() => {
-    const loadCandidate = async () => {
-      if (!candidateId) {
-        return;
-      }
-
-      setLoading(true);
-      try {
-        const data = await getCandidateById(candidateId);
-        setCandidate(data);
-        setError(null);
-      } catch (err) {
-        setError(err instanceof Error ? err.message : 'Failed to load candidate');
-      } finally {
-        setLoading(false);
-      }
-    };
-
-    void loadCandidate();
-  }, [candidateId]);
-
-  if (loading) {
+  if (isLoading) {
     return <div className="h-[220px] animate-pulse rounded-xl border border-[var(--app-border)] bg-[var(--app-surface-soft)]" />;
   }
 
   if (error || !candidate) {
     return (
       <div className="space-y-4">
-        <p className="rounded-lg border border-[var(--app-danger-border)] bg-[var(--app-danger-bg)] p-4 text-sm text-[var(--app-danger-text)]">{error || 'Candidate not found.'}</p>
+        <p className="rounded-lg border border-[var(--app-danger-border)] bg-[var(--app-danger-bg)] p-4 text-sm text-[var(--app-danger-text)]">
+          {error ? 'Failed to load candidate' : 'Candidate not found.'}
+        </p>
         <Button asChild>
           <Link href="/candidates">Back to candidates</Link>
         </Button>
       </div>
     );
   }
+
+  const skills = candidate.skills || [];
 
   return (
     <div className="space-y-6">
@@ -61,7 +40,7 @@ export default function CandidateDetailPage() {
           <Button asChild variant="ghost" className="mb-2 w-fit px-0 text-[var(--app-muted)]">
             <Link href="/candidates">Back to candidates</Link>
           </Button>
-          <CardTitle className="text-3xl">{candidate.full_name}</CardTitle>
+          <CardTitle className="text-3xl">{candidate.full_name || 'Unknown Candidate'}</CardTitle>
           <CardDescription>Candidate profile generated from parsed resume content.</CardDescription>
         </CardHeader>
         <CardContent>
@@ -92,11 +71,11 @@ export default function CandidateDetailPage() {
           <CardDescription>Extracted and normalized from parsed documents</CardDescription>
         </CardHeader>
         <CardContent>
-        {(candidate.skills || []).length === 0 ? (
+        {skills.length === 0 ? (
           <p className="rounded-md border border-[var(--app-border)] bg-[var(--app-surface-soft)] p-3 text-sm text-[var(--app-muted)]">No extracted skills yet.</p>
         ) : (
           <div className="flex flex-wrap gap-2">
-            {(candidate.skills || []).map((skill) => (
+            {skills.map((skill: string) => (
               <Badge key={skill} variant="secondary">{skill}</Badge>
             ))}
           </div>

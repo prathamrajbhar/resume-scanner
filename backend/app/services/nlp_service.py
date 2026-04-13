@@ -81,6 +81,63 @@ class NLPService:
                     break
         return detected
 
+    def extract_candidate_name(self, text: str, filename: str = "") -> Optional[str]:
+        """
+        Best-effort candidate name extraction.
+        Strategy:
+        1) Prefer first meaningful line in resume text.
+        2) Fall back to filename-derived name.
+        """
+        lines = [line.strip() for line in text.splitlines() if line and line.strip()]
+        name_stopwords = {
+            'resume', 'curriculum', 'vitae', 'email', 'phone', 'contact', 'summary',
+            'objective', 'skills', 'education', 'experience', 'projects', 'linkedin',
+        }
+
+        for line in lines[:12]:
+            compact = re.sub(r'\s+', ' ', line).strip()
+            if len(compact) < 3 or len(compact) > 60:
+                continue
+            if any(ch.isdigit() for ch in compact):
+                continue
+            if '@' in compact:
+                continue
+
+            words = [w for w in re.split(r'\s+', compact) if w]
+            if not (2 <= len(words) <= 4):
+                continue
+
+            lowered_words = {w.lower() for w in words}
+            if lowered_words & name_stopwords:
+                continue
+
+            # Keep only alphabetic-ish names like "John Dsouza".
+            if all(re.fullmatch(r"[A-Za-z][A-Za-z'.-]*", w) for w in words):
+                return ' '.join(w.capitalize() for w in words)
+
+        stem = filename.rsplit('.', 1)[0] if filename else ''
+        cleaned = re.sub(r'[_\-]+', ' ', stem).strip()
+        if cleaned:
+            tokens = [t for t in cleaned.split() if t]
+            if 1 <= len(tokens) <= 5:
+                return ' '.join(token.capitalize() for token in tokens)
+
+        return None
+
+    def extract_candidate_profile(self, text: str, filename: str = "") -> Dict:
+        email_match = re.search(r'[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}', text)
+        phone_match = re.search(r'(?:\+?\d{1,3}[\s-]?)?(?:\(?\d{3}\)?[\s-]?)?\d{3}[\s-]?\d{4}', text)
+
+        return {
+            'full_name': self.extract_candidate_name(text, filename),
+            'email': email_match.group(0) if email_match else None,
+            'phone': phone_match.group(0) if phone_match else None,
+            'location': None,
+            'skills': sorted(list(self.extract_skills(text))),
+            'total_experience': None,
+            'education': None,
+        }
+
     def score_tfidf(self, resume_text: str, job_description: str) -> float:
         if not resume_text or not job_description: return 0.0
         vectorizer = TfidfVectorizer(stop_words='english')

@@ -34,7 +34,7 @@ export default function RootLayout({
       </head>
       <body className={`${manrope.variable} ${spaceGrotesk.variable}`}>
         <Providers>
-          <AppShell>{children}</AppShell>
+          {children}
         </Providers>
       </body>
     </html>

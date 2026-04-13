@@ -6,9 +6,10 @@ type FileUploadBoxProps = {
   onBrowse: () => void;
   onDropFiles: (files: File[]) => void;
   disabled?: boolean;
+  selectedCount?: number;
 };
 
-export function FileUploadBox({ onBrowse, onDropFiles, disabled = false }: FileUploadBoxProps) {
+export function FileUploadBox({ onBrowse, onDropFiles, disabled = false, selectedCount = 0 }: FileUploadBoxProps) {
   const handleDrop = (event: DragEvent<HTMLDivElement>) => {
     event.preventDefault();
     if (disabled) {
@@ -29,16 +30,20 @@ export function FileUploadBox({ onBrowse, onDropFiles, disabled = false }: FileU
     <div
       onDrop={handleDrop}
       onDragOver={handleDragOver}
-      className="surface-panel-soft rounded-2xl border-2 border-dashed border-[var(--app-border)] p-8 text-center"
+      className="surface-panel-soft rounded-xl border-2 border-dashed border-[var(--app-border)] p-6 text-center hover:border-blue-500 hover:bg-blue-50 transition-all duration-200"
     >
-      <div className="mx-auto mb-3 flex h-12 w-12 items-center justify-center rounded-full bg-[var(--app-brand-soft)] text-[var(--app-brand)]">
-        <CloudUpload className="h-6 w-6" />
+      <div className="mx-auto mb-3 flex h-10 w-10 items-center justify-center rounded-full bg-blue-50">
+        <CloudUpload className="h-6 w-6 text-blue-600" />
       </div>
-      <p className="text-base font-semibold text-[var(--app-text)]">Drag & drop resume files</p>
-      <p className="mt-1 text-sm text-[var(--app-muted)]">PDF, DOCX, TXT supported</p>
+      <p className="text-base font-semibold text-[var(--app-text)]">Upload candidate resumes</p>
+      <p className="mt-1 text-sm text-[var(--app-muted)]">Supported formats: PDF, DOCX, TXT • Max size: 200MB</p>
       <Button type="button" variant="secondary" className="mt-4" onClick={onBrowse} disabled={disabled}>
         Browse files
       </Button>
+      <p className="text-xs text-gray-500 text-center mt-2">
+        Upload multiple resumes to get AI-powered ranking and top candidate selection.
+      </p>
+      {selectedCount > 0 ? <p className="text-sm text-blue-600 mt-2">{selectedCount} files selected</p> : null}
     </div>
   );
 }

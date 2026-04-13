@@ -7,6 +7,7 @@ export const CHAT_MESSAGES_STORAGE_KEY = 'resume_scanner_chat_messages';
 export const CHAT_UPLOADS_STORAGE_KEY = 'resume_scanner_chat_uploads';
 export const CHAT_ID_STORAGE_KEY = 'resume_scanner_chat_id';
 export const CHAT_SESSIONS_STORAGE_KEY = 'resume_scanner_chat_sessions';
+export const PROFILE_SETUP_REQUIRED_KEY = 'resume_scanner_profile_setup_required';
 
 export const defaultSettings: AppSettings = {
   theme: 'light',
@@ -188,7 +189,32 @@ export const clearStoredAuth = () => {
 
   window.localStorage.removeItem(TOKEN_STORAGE_KEY);
   window.localStorage.removeItem(USER_STORAGE_KEY);
+  window.localStorage.removeItem(PROFILE_SETUP_REQUIRED_KEY);
   clearAuthCookie();
   window.dispatchEvent(new Event('resume:auth-updated'));
   window.dispatchEvent(new Event('resume:user-updated'));
+};
+
+export const setProfileSetupRequired = (required: boolean) => {
+  if (!isBrowser()) {
+    return;
+  }
+
+  if (required) {
+    window.localStorage.setItem(PROFILE_SETUP_REQUIRED_KEY, '1');
+  } else {
+    window.localStorage.removeItem(PROFILE_SETUP_REQUIRED_KEY);
+  }
+};
+
+export const consumeProfileSetupRequired = (): boolean => {
+  if (!isBrowser()) {
+    return false;
+  }
+
+  const required = window.localStorage.getItem(PROFILE_SETUP_REQUIRED_KEY) === '1';
+  if (required) {
+    window.localStorage.removeItem(PROFILE_SETUP_REQUIRED_KEY);
+  }
+  return required;
 };

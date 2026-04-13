@@ -15,20 +15,17 @@ export function ProfileModalContent({ onClose }: ProfileModalContentProps) {
   const router = useRouter();
   const [user, setUser] = useState<User | null>(null);
   const [name, setName] = useState('');
-  const [email, setEmail] = useState('');
   const [status, setStatus] = useState<string | null>(null);
 
   useEffect(() => {
     const storedUser = getStoredUser();
     setUser(storedUser);
     setName(storedUser?.full_name || '');
-    setEmail(storedUser?.email || '');
 
     const onUserUpdated = () => {
       const nextUser = getStoredUser();
       setUser(nextUser);
       setName(nextUser?.full_name || '');
-      setEmail(nextUser?.email || '');
     };
     window.addEventListener('resume:user-updated', onUserUpdated);
 
@@ -57,10 +54,9 @@ export function ProfileModalContent({ onClose }: ProfileModalContentProps) {
     }
 
     const nextName = name.trim();
-    const nextEmail = email.trim();
 
-    if (!nextName || !nextEmail) {
-      setStatus('Name and email are required.');
+    if (!nextName) {
+      setStatus('Name is required.');
       return;
     }
 
@@ -72,7 +68,6 @@ export function ProfileModalContent({ onClose }: ProfileModalContentProps) {
     const nextUser: User = {
       ...user,
       full_name: nextName,
-      email: nextEmail,
     };
 
     setStoredUser(nextUser);
@@ -100,8 +95,11 @@ export function ProfileModalContent({ onClose }: ProfileModalContentProps) {
       <div className="rounded-xl border border-gray-200 bg-white p-4 shadow-sm">
         <div className="flex items-center gap-3">
           <Avatar className="h-14 w-14">
-            {user?.avatar_url ? <AvatarImage src={user.avatar_url} alt={user.full_name || 'User'} /> : null}
-            <AvatarFallback>{initials}</AvatarFallback>
+            {user?.avatar_url ? (
+              <AvatarImage src={user.avatar_url} alt={user.full_name || 'User'} />
+            ) : (
+              <AvatarFallback>{initials}</AvatarFallback>
+            )}
           </Avatar>
           <div className="min-w-0">
             <p className="truncate text-base font-semibold text-gray-900">{name || 'Name unavailable'}</p>
@@ -131,10 +129,9 @@ export function ProfileModalContent({ onClose }: ProfileModalContentProps) {
           <input
             id="profile-email"
             type="email"
-            value={email}
-            onChange={(event) => setEmail(event.target.value)}
-            className="h-10 w-full rounded-md border border-gray-300 bg-white px-3 text-sm text-gray-800"
-            placeholder="Enter your email"
+            value={user?.email || ''}
+            readOnly
+            className="h-10 w-full cursor-not-allowed rounded-md border border-gray-300 bg-gray-100 px-3 text-sm text-gray-600"
           />
         </div>
         <div className="rounded-md border border-gray-200 bg-white p-3">

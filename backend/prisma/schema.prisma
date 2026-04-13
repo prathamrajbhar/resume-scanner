@@ -16,60 +16,79 @@ model User {
   google_id  String?  @unique
   created_at DateTime @default(now())
   chats      Chat[]
+  skills     Skill[]
+  resumes    Resume[]
+  job_roles  JobRole[]
+}
+
+model Skill {
+  id         String   @id @default(uuid())
+  name       String   @unique
+  category   String?
+  created_by String?
+  is_global  Boolean  @default(true)
+  created_at DateTime @default(now())
+  user       User?    @relation(fields: [created_by], references: [id])
+  job_skills JobSkill[]
+}
+
+model JobRole {
+  id          String   @id @default(uuid())
+  title       String
+  description String?
+  created_by  String?
+  created_at  DateTime @default(now())
+  user        User?    @relation(fields: [created_by], references: [id])
+  skills      JobSkill[]
+  analyses    Analysis[]
+}
+
+model JobSkill {
+  id         String   @id @default(uuid())
+  job_id     String
+  skill_id   String
+  level      String   @default("intermediate") // beginner, intermediate, expert
+  job        JobRole  @relation(fields: [job_id], references: [id])
+  skill      Skill    @relation(fields: [skill_id], references: [id])
+}
+
+model Resume {
+  id                String    @id @default(uuid())
+  file_name         String
+  parsed_data       Json?
+  content_text      String
+  uploaded_by       String
+  created_at        DateTime  @default(now())
+  user              User      @relation(fields: [uploaded_by], references: [id])
+  analyses          Analysis[]
+}
+
+model Analysis {
+  id             String   @id @default(uuid())
+  job_id         String
+  resume_id      String
+  score          Float
+  matched_skills Json?
+  missing_skills Json?
+  created_at     DateTime @default(now())
+  job            JobRole  @relation(fields: [job_id], references: [id])
+  resume         Resume   @relation(fields: [resume_id], references: [id])
 }
 
 model Chat {
   id              String           @id @default(uuid())
   user_id         String
   title           String
-  job_description String
   created_at      DateTime         @default(now())
   user            User             @relation(fields: [user_id], references: [id])
   messages        ChatMessage[]
-  scores          CandidateScore[]
 }
 
 model ChatMessage {
   id               String   @id @default(uuid())
   chat_id          String
-  role             String
+  role             String   @default("user") // user, assistant
   content          String
   created_at       DateTime @default(now())
-  message_metadata Json?
   chat             Chat     @relation(fields: [chat_id], references: [id])
-}
-
-model Resume {
-  id                String    @id @default(uuid())
-  candidate_id      String
-  drive_file_id     String
-  original_filename String
-  content_text      String
-  created_at        DateTime  @default(now())
-  candidate         Candidate @relation(fields: [candidate_id], references: [id])
-}
-
-model Candidate {
-  id               String           @id @default(uuid())
-  full_name        String
-  email            String?
-  phone            String?
-  location         String?
-  skills           Json?
-  total_experience Float?
-  education        String?
-  resumes          Resume[]
-  scores           CandidateScore[]
-}
-
-model CandidateScore {
-  id           String    @id @default(uuid())
-  chat_id      String
-  candidate_id String
-  model_type   String
-  score        Float
-  breakdown    Json?
-  created_at   DateTime  @default(now())
-  chat         Chat      @relation(fields: [chat_id], references: [id])
-  candidate    Candidate @relation(fields: [candidate_id], references: [id])
 }

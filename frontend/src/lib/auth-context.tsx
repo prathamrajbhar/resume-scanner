@@ -3,6 +3,7 @@
 import React, { createContext, useContext, useState, useEffect, ReactNode } from 'react';
 import axios from 'axios';
 import { GoogleOAuthProvider } from '@react-oauth/google';
+import { clearStoredAuth, getStoredToken, getStoredUser, setStoredToken, setStoredUser } from '@/lib/storage';
 
 export interface User {
   id: string;
@@ -35,7 +36,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   // Check valid token on load
   useEffect(() => {
     const checkAuth = async () => {
-      const token = localStorage.getItem('token');
+      const token = getStoredToken();
       if (token) {
         try {
           axios.defaults.headers.common['Authorization'] = `Bearer ${token}`;
@@ -43,8 +44,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           setUser(res.data);
         } catch (error) {
           console.error("Invalid token", error);
-          localStorage.removeItem('token');
-          delete axios.defaults.headers.common['Authorization'];
+          clearStoredAuth();
+        }
+      } else {
+        const storedUser = getStoredUser();
+        if (storedUser) {
+          setUser(storedUser);
         }
       }
       setLoading(false);
@@ -58,7 +63,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         credential
       });
       const { access_token, user } = response.data;
-      localStorage.setItem('token', access_token);
+      setStoredToken(access_token);
+      setStoredUser(user);
       axios.defaults.headers.common['Authorization'] = `Bearer ${access_token}`;
       setUser(user);
     } catch (error) {
@@ -68,7 +74,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   };
 
   const logout = () => {
-    localStorage.removeItem('token');
+    clearStoredAuth();
     delete axios.defaults.headers.common['Authorization'];
     setUser(null);
   };
