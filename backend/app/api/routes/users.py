@@ -63,3 +63,42 @@ async def delete_account(
     await db.user.delete(where={"id": user_id})
 
     return {"message": "Account and associated data deleted"}
+
+
+@router.delete("/memory/candidates")
+async def delete_all_candidates(
+    current_user = Depends(get_current_user),
+    db: Prisma = Depends(get_db)
+):
+    user_id = current_user.id
+
+    candidates = await db.resume.find_many(where={"uploaded_by": user_id})
+    candidate_count = len(candidates)
+
+    await db.analysis.delete_many(where={"resume": {"uploaded_by": user_id}})
+    await db.resume.delete_many(where={"uploaded_by": user_id})
+
+    return {
+        "message": "All candidates deleted",
+        "deleted_candidates": candidate_count,
+    }
+
+
+@router.delete("/memory/jobs")
+async def delete_all_jobs(
+    current_user = Depends(get_current_user),
+    db: Prisma = Depends(get_db)
+):
+    user_id = current_user.id
+
+    jobs = await db.jobrole.find_many(where={"created_by": user_id})
+    job_count = len(jobs)
+
+    await db.analysis.delete_many(where={"job": {"created_by": user_id}})
+    await db.jobskill.delete_many(where={"job": {"created_by": user_id}})
+    await db.jobrole.delete_many(where={"created_by": user_id})
+
+    return {
+        "message": "All jobs deleted",
+        "deleted_jobs": job_count,
+    }

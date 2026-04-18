@@ -1,6 +1,7 @@
 import asyncio
 import logging
 import os
+import re
 import smtplib
 from datetime import datetime, timezone
 from email.message import EmailMessage
@@ -79,3 +80,68 @@ async def send_auth_activity_email(*, to_email: str, full_name: str | None, even
         logger.info("[Email] Async email send completed successfully")
     except Exception as exc:
         logger.error(f"[Email] Failed to send auth activity email: {exc}", exc_info=True)
+
+
+def _looks_like_email(value: str) -> bool:
+    return bool(re.match(r"^[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}$", (value or "").strip()))
+
+
+def _send_candidate_selection_email_sync(*, to_email: str, full_name: str | None, role_title: str, selection_type: str) -> bool:
+    enabled = _env_flag("CANDIDATE_SELECTION_EMAIL_ENABLED", default=False)
+    logger.info(f"[Email] CANDIDATE_SELECTION_EMAIL_ENABLED = {enabled}")
+    if not enabled:
+        logger.info("[Email] Candidate selection email disabled, skipping send.")
+        return False
+
+    if not _looks_like_email(to_email):
+        logger.warning("[Email] Candidate selection email skipped due to invalid recipient email format")
+        return False
+
+    smtp_host = os.getenv("SMTP_HOST", "smtp.gmail.com").strip()
+    smtp_port = int(os.getenv("SMTP_PORT", "587"))
+    smtp_username = os.getenv("SMTP_USERNAME", "").strip()
+    smtp_password = os.getenv("SMTP_PASSWORD", "").strip()
+    from_email = os.getenv("SMTP_FROM_EMAIL", smtp_username).strip()
+    from_name = os.getenv("SMTP_FROM_NAME", "AI HR Copilot").strip()
+
+    if not smtp_username or not smtp_password or not from_email:
+        logger.error("[Email] SMTP credentials missing: username, password, or from_email is empty")
+        return False
+
+    selection_label = "Final Select" if selection_type == "final_select" else "Selected"
+    display_name = (full_name or "Candidate").strip() or "Candidate"
+
+    message = EmailMessage()
+    message["Subject"] = f"Update on your application for {role_title}"
+    message["From"] = f"{from_name} <{from_email}>"
+    message["To"] = to_email
+    message.set_content(
+        f"Hello {display_name},\n\n"
+        f"Your profile has been marked as '{selection_label}' for the role '{role_title}'.\n"
+        "Our hiring team may contact you with next steps.\n\n"
+        "Thank you for your interest.\n\n"
+        "- AI HR Copilot"
+    )
+
+    with smtplib.SMTP(smtp_host, smtp_port, timeout=20) as server:
+        server.starttls()
+        server.login(smtp_username, smtp_password)
+        server.send_message(message)
+
+    logger.info(f"[Email] Candidate selection email sent to {to_email}")
+    return True
+
+
+async def send_candidate_selection_email(*, to_email: str, full_name: str | None, role_title: str, selection_type: str) -> bool:
+    try:
+        sent = await asyncio.to_thread(
+            _send_candidate_selection_email_sync,
+            to_email=to_email,
+            full_name=full_name,
+            role_title=role_title,
+            selection_type=selection_type,
+        )
+        return bool(sent)
+    except Exception as exc:
+        logger.error(f"[Email] Failed to send candidate selection email: {exc}", exc_info=True)
+        return False

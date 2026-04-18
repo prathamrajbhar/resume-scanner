@@ -2,18 +2,22 @@
 
 import Link from 'next/link';
 import { useMemo, useState } from 'react';
-import { MapPin, Search, UserRound } from 'lucide-react';
-import { useCandidates, useJobs } from '@/lib/hooks';
+import { MapPin, Search, Trash2, UserRound } from 'lucide-react';
+import { useCandidates, useDeleteCandidate, useJobs } from '@/lib/hooks';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
+import { useTopToast } from '@/components/ui/top-toast';
 
 export default function CandidatesPage() {
+  const { showToast } = useTopToast();
   const [query, setQuery] = useState('');
   const [selectedRoleId, setSelectedRoleId] = useState('');
   const [activeTab, setActiveTab] = useState<'shortlisted' | 'all'>('shortlisted');
+  const [pendingDeleteCandidate, setPendingDeleteCandidate] = useState<{ id: string; name: string } | null>(null);
   const { data: roles = [] } = useJobs();
+  const deleteCandidateMutation = useDeleteCandidate();
   const { data: candidates = [], isLoading, error } = useCandidates({
     roleId: selectedRoleId || undefined,
     shortlisted: activeTab === 'shortlisted',
@@ -42,6 +46,26 @@ export default function CandidatesPage() {
              location.includes(term);
     });
   }, [candidates, query]);
+
+  const handleConfirmDelete = async () => {
+    if (!pendingDeleteCandidate) {
+      return;
+    }
+
+    try {
+      await deleteCandidateMutation.mutateAsync(pendingDeleteCandidate.id);
+      showToast({
+        message: 'Candidate deleted successfully',
+        tone: 'success',
+      });
+      setPendingDeleteCandidate(null);
+    } catch (deleteError) {
+      showToast({
+        message: deleteError instanceof Error ? deleteError.message : 'Failed to delete candidate',
+        tone: 'error',
+      });
+    }
+  };
 
   return (
     <div className="space-y-6">
@@ -137,7 +161,19 @@ export default function CandidatesPage() {
                     <UserRound className="h-4 w-4 text-[var(--app-subtle)]" />
                     <h2 className="text-lg font-semibold">{candidate.full_name || 'Unknown Candidate'}</h2>
                   </div>
-                  <Badge variant="secondary">{(candidate.skills || []).length} skills</Badge>
+                  <div className="flex items-center gap-2">
+                    <Badge variant="secondary">{(candidate.skills || []).length} skills</Badge>
+                    <button
+                      type="button"
+                      onClick={() => setPendingDeleteCandidate({ id: candidate.id, name: candidate.full_name || 'this candidate' })}
+                      className="inline-flex items-center gap-1 rounded-md px-2 py-1 text-xs font-medium text-red-600 transition hover:bg-red-50"
+                      aria-label={`Delete ${candidate.full_name || 'candidate'}`}
+                      title="Delete candidate"
+                    >
+                      <Trash2 className="h-3.5 w-3.5" />
+                      Delete
+                    </button>
+                  </div>
                 </div>
 
                 <p className="mt-2 flex items-center gap-1.5 text-sm text-[var(--app-muted)]">
@@ -177,6 +213,46 @@ export default function CandidatesPage() {
             </Link>
           ) : null}
         </p>
+      ) : null}
+
+      {pendingDeleteCandidate ? (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black/35 px-4 backdrop-blur-sm"
+          onMouseDown={(event) => {
+            if (event.target === event.currentTarget) {
+              setPendingDeleteCandidate(null);
+            }
+          }}
+          role="presentation"
+        >
+          <div className="w-full max-w-md rounded-2xl border border-[var(--app-border)] bg-white p-6 shadow-2xl">
+            <h3 className="text-lg font-semibold text-[var(--app-text)]">Delete Candidate?</h3>
+            <p className="mt-2 text-sm text-[var(--app-muted)]">
+              This will permanently delete this candidate and all related data. This action cannot be undone.
+            </p>
+
+            <div className="mt-6 flex items-center justify-end gap-2">
+              <Button
+                type="button"
+                variant="secondary"
+                onClick={() => {
+                  setPendingDeleteCandidate(null);
+                }}
+              >
+                Cancel
+              </Button>
+              <Button
+                type="button"
+                onClick={handleConfirmDelete}
+                disabled={deleteCandidateMutation.isPending}
+                className="border border-red-300 bg-white text-red-600 hover:bg-red-50"
+              >
+                <Trash2 className="h-4 w-4" />
+                {deleteCandidateMutation.isPending ? 'Deleting...' : 'Delete'}
+              </Button>
+            </div>
+          </div>
+        </div>
       ) : null}
     </div>
   );

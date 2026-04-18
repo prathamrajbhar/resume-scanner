@@ -27,6 +27,15 @@ class SkillBase(BaseModel):
 class SkillCreate(SkillBase):
     pass
 
+
+class SkillBulkCreate(BaseModel):
+    skills: List[str]
+    level: Optional[str] = "intermediate"
+    global_flag: bool = Field(default=True, alias="global")
+
+    class Config:
+        populate_by_name = True
+
 class SkillSimple(BaseModel):
     id: str
     name: str
@@ -49,18 +58,27 @@ class JobSkillBase(BaseModel):
 class JobRoleCreate(BaseModel):
     title: str
     description: Optional[str] = None
+    auto_select_enabled: bool = False
+    auto_select_threshold: int = 70
+    require_hr_confirmation: bool = True
     skills: List[JobSkillBase]
 
 
 class JobRoleUpdate(BaseModel):
     title: Optional[str] = None
     description: Optional[str] = None
+    auto_select_enabled: Optional[bool] = None
+    auto_select_threshold: Optional[int] = None
+    require_hr_confirmation: Optional[bool] = None
     skills: List[JobSkillBase]
 
 class JobRoleSimple(BaseModel):
     id: str
     title: str
     description: Optional[str] = None
+    auto_select_enabled: bool = False
+    auto_select_threshold: int = 70
+    require_hr_confirmation: bool = True
     created_by: Optional[str] = None
     created_at: datetime
     class Config:
@@ -92,17 +110,64 @@ class ResumeSimple(BaseModel):
 class AnalysisResult(BaseModel):
     candidate_name: str
     score: float
+    education_score: float = 0
+    academic_score: float = 0
+    experience_score: float = 0
+    skill_match_score: float = 0
+    project_score: float = 0
+    soft_skill_score: float = 0
+    final_score: float = 0
     matched_skills: List[str]
     missing_skills: List[str]
 
 
 class AnalysisResultCard(BaseModel):
+    class DegreeEntry(BaseModel):
+        degree: Optional[str] = None
+        field: Optional[str] = None
+        cgpa: Optional[float] = None
+
+    class ExperienceEntry(BaseModel):
+        role: Optional[str] = None
+        duration: Optional[str] = None
+
     id: str
+    resume_id: str
     name: str
+    email: Optional[str] = None
     score: float
+    education_score: float = 0
+    academic_score: float = 0
+    experience_score: float = 0
+    skill_match_score: float = 0
+    project_score: float = 0
+    soft_skill_score: float = 0
+    final_score: float = 0
     top_skills: List[str]
     matched_skills: List[str]
     missing_skills: List[str]
+    cgpa: Optional[float] = None
+    cgpa_or_percentage: Optional[float] = None
+    sgpa: Optional[float] = None
+    degree: Optional[str] = None
+    university: Optional[str] = None
+    total_experience_years: Optional[float] = None
+    relevant_experience_years: Optional[float] = None
+    projects_count: Optional[int] = None
+    soft_skills: List[str] = []
+    normalized_skills: List[str] = []
+    internships: List[str] = []
+    communication_score: float = 0
+    leadership_score: float = 0
+    teamwork_score: float = 0
+    problem_solving_score: float = 0
+    auto_selected: bool = False
+    selected: bool = False
+    selection_status: str = "rejected"
+    degrees: List[DegreeEntry] = []
+    experience_list: List[ExperienceEntry] = []
+    projects: List[str] = []
+    certifications: List[str] = []
 
 # Chat
 class ChatMessageBase(BaseModel):

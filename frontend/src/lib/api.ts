@@ -200,9 +200,19 @@ export const getCandidateById = async (candidateId: string): Promise<Candidate> 
   }
 };
 
+export const deleteCandidate = async (candidateId: string): Promise<{ message: string }> => {
+  try {
+    const api = getApiClient();
+    const response = await api.delete<{ message: string }>(`/api/candidates/${candidateId}`);
+    return response.data;
+  } catch (error) {
+    throw new Error(getErrorMessage(error));
+  }
+};
+
 export const shortlistCandidate = async (
   candidateId: string,
-  payload: { role_id: string; selection_type: 'select' | 'final_select' }
+  payload: { role_id: string; selection_type: 'select' | 'final_select'; send_selection_email?: boolean }
 ): Promise<any> => {
   try {
     const api = getApiClient();
@@ -246,6 +256,18 @@ export const deleteAccount = async (): Promise<void> => {
   await api.delete('/api/users/account');
 };
 
+export const deleteAllCandidates = async (): Promise<{ message: string; deleted_candidates: number }> => {
+  const api = getApiClient();
+  const response = await api.delete('/api/users/memory/candidates');
+  return response.data as { message: string; deleted_candidates: number };
+};
+
+export const deleteAllJobs = async (): Promise<{ message: string; deleted_jobs: number }> => {
+  const api = getApiClient();
+  const response = await api.delete('/api/users/memory/jobs');
+  return response.data as { message: string; deleted_jobs: number };
+};
+
 // Skills API
 export const getSkills = async (): Promise<any[]> => {
   const api = getApiClient();
@@ -257,6 +279,21 @@ export const createSkill = async (skill: { name: string; category?: string; is_g
   const api = getApiClient();
   const response = await api.post('/api/skills', skill);
   return response.data;
+};
+
+export const createSkillsBulk = async (payload: {
+  skills: string[];
+  level: 'beginner' | 'intermediate' | 'advanced' | 'expert' | 'not_required';
+  global: boolean;
+}): Promise<any[]> => {
+  const api = getApiClient();
+  const response = await api.post('/api/skills/bulk', payload);
+  return response.data;
+};
+
+export const deleteSkill = async (skillId: string): Promise<void> => {
+  const api = getApiClient();
+  await api.delete(`/api/skills/${skillId}`);
 };
 
 // Jobs API
@@ -316,24 +353,152 @@ export const getJobById = async (id: string): Promise<any> => {
   }
 };
 
-export const createJob = async (job: { title: string; description?: string; skills: any[] }): Promise<any> => {
-  const api = getApiClient();
-  const response = await api.post('/api/jobs', job);
-  return response.data;
+export const createJob = async (job: {
+  title: string;
+  description?: string;
+  auto_select_enabled?: boolean;
+  auto_select_threshold?: number;
+  require_hr_confirmation?: boolean;
+  skills: any[];
+}): Promise<any> => {
+  if (typeof window !== 'undefined') {
+    try {
+      const proxyResponse = await fetch('/api/db/jobs', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(job),
+      });
+
+      if (proxyResponse.ok) {
+        return (await proxyResponse.json()) as any;
+      }
+
+      const proxyPayload = (await proxyResponse.json().catch(() => null)) as { detail?: string } | null;
+      throw new Error(proxyPayload?.detail || 'Failed to create job role');
+    } catch (proxyError) {
+      // If proxy fetch itself fails (not an HTTP error), try direct backend as fallback.
+      if (proxyError instanceof TypeError) {
+        try {
+          const api = getApiClient();
+          const response = await api.post('/api/jobs', job);
+          return response.data;
+        } catch (error) {
+          throw new Error(getErrorMessage(error));
+        }
+      }
+
+      if (proxyError instanceof Error) {
+        throw proxyError;
+      }
+
+      throw new Error('Failed to create job role');
+    }
+  }
+
+  try {
+    const api = getApiClient();
+    const response = await api.post('/api/jobs', job);
+    return response.data;
+  } catch (error) {
+    throw new Error(getErrorMessage(error));
+  }
 };
 
 export const updateJob = async (
   id: string,
-  job: { title?: string; description?: string; skills: any[] }
+  job: {
+    title?: string;
+    description?: string;
+    auto_select_enabled?: boolean;
+    auto_select_threshold?: number;
+    require_hr_confirmation?: boolean;
+    skills: any[];
+  }
 ): Promise<any> => {
-  const api = getApiClient();
-  const response = await api.patch(`/api/jobs/${id}`, job);
-  return response.data;
+  if (typeof window !== 'undefined') {
+    try {
+      const proxyResponse = await fetch(`/api/db/jobs/${id}`, {
+        method: 'PATCH',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(job),
+      });
+
+      if (proxyResponse.ok) {
+        return (await proxyResponse.json()) as any;
+      }
+
+      const proxyPayload = (await proxyResponse.json().catch(() => null)) as { detail?: string } | null;
+      throw new Error(proxyPayload?.detail || 'Failed to update job role');
+    } catch (proxyError) {
+      if (proxyError instanceof TypeError) {
+        try {
+          const api = getApiClient();
+          const response = await api.patch(`/api/jobs/${id}`, job);
+          return response.data;
+        } catch (error) {
+          throw new Error(getErrorMessage(error));
+        }
+      }
+
+      if (proxyError instanceof Error) {
+        throw proxyError;
+      }
+
+      throw new Error('Failed to update job role');
+    }
+  }
+
+  try {
+    const api = getApiClient();
+    const response = await api.patch(`/api/jobs/${id}`, job);
+    return response.data;
+  } catch (error) {
+    throw new Error(getErrorMessage(error));
+  }
 };
 
 export const deleteJob = async (id: string): Promise<void> => {
-  const api = getApiClient();
-  await api.delete(`/api/jobs/${id}`);
+  if (typeof window !== 'undefined') {
+    try {
+      const proxyResponse = await fetch(`/api/db/jobs/${id}`, {
+        method: 'DELETE',
+      });
+
+      if (proxyResponse.ok) {
+        return;
+      }
+
+      const proxyPayload = (await proxyResponse.json().catch(() => null)) as { detail?: string } | null;
+      throw new Error(proxyPayload?.detail || 'Failed to delete job role');
+    } catch (proxyError) {
+      if (proxyError instanceof TypeError) {
+        try {
+          const api = getApiClient();
+          await api.delete(`/api/jobs/${id}`);
+          return;
+        } catch (error) {
+          throw new Error(getErrorMessage(error));
+        }
+      }
+
+      if (proxyError instanceof Error) {
+        throw proxyError;
+      }
+
+      throw new Error('Failed to delete job role');
+    }
+  }
+
+  try {
+    const api = getApiClient();
+    await api.delete(`/api/jobs/${id}`);
+  } catch (error) {
+    throw new Error(getErrorMessage(error));
+  }
 };
 
 // Resumes API
@@ -373,6 +538,22 @@ export const getAnalysisResults = async (jobId?: string): Promise<any[]> => {
   const response = await api.get('/api/analysis/results', {
     params: jobId ? { job_id: jobId } : undefined,
   });
+  return response.data;
+};
+
+export const confirmAutoSelection = async (payload: { job_id: string; resume_ids?: string[] }): Promise<any> => {
+  const api = getApiClient();
+  const response = await api.post('/api/analysis/confirm-selection', payload);
+  return response.data;
+};
+
+export const sendInterviewEmail = async (payload: {
+  candidate_emails: string[];
+  job_role: string;
+  template: string;
+}): Promise<any> => {
+  const api = getApiClient();
+  const response = await api.post('/send-email', payload);
   return response.data;
 };
 

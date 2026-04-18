@@ -60,3 +60,40 @@ export async function GET(request: Request) {
     return NextResponse.json({ detail: message }, { status: 500 });
   }
 }
+
+export async function POST(request: Request) {
+  try {
+    const token = readTokenFromCookieHeader(request.headers.get('cookie'));
+    if (!token) {
+      return NextResponse.json({ detail: 'Unauthorized' }, { status: 401 });
+    }
+
+    const payload = await request.json();
+    const upstream = await fetch(`${API_BASE_URL}/api/jobs/`, {
+      method: 'POST',
+      headers: {
+        Authorization: `Bearer ${token}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify(payload),
+      cache: 'no-store',
+    });
+
+    const contentType = upstream.headers.get('content-type') || '';
+    const upstreamBody = contentType.includes('application/json')
+      ? await upstream.json()
+      : { detail: await upstream.text() };
+
+    if (!upstream.ok) {
+      return NextResponse.json(
+        upstreamBody || { detail: 'Failed to create job role' },
+        { status: upstream.status }
+      );
+    }
+
+    return NextResponse.json(upstreamBody, { status: upstream.status });
+  } catch (error) {
+    const message = error instanceof Error ? error.message : 'Failed to create job role';
+    return NextResponse.json({ detail: message }, { status: 500 });
+  }
+}

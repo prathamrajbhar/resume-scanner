@@ -28,7 +28,8 @@ const setAuthCookie = (token: string) => {
   }
 
   const secure = window.location.protocol === 'https:' ? '; Secure' : '';
-  document.cookie = `${TOKEN_STORAGE_KEY}=${encodeURIComponent(token)}; Path=/; Max-Age=604800; SameSite=Lax${secure}`;
+  // Keep the auth cookie for a very long time to avoid session loss across restarts.
+  document.cookie = `${TOKEN_STORAGE_KEY}=${encodeURIComponent(token)}; Path=/; Max-Age=315360000; SameSite=Lax${secure}`;
 };
 
 const clearAuthCookie = () => {

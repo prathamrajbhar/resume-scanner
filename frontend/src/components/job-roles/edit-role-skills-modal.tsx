@@ -1,9 +1,10 @@
 'use client';
 
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { ChevronDown, Plus, Search } from 'lucide-react';
+import { ChevronDown, Plus, Search, Trash2 } from 'lucide-react';
 import { SkillLevel, SkillLevels } from '@/data/skills';
-import { createSkill, getSkills } from '@/lib/api';
+import { createSkillsBulk, deleteSkill, getSkills } from '@/lib/api';
+import { ConfirmModal } from '@/components/chat/confirm-modal';
 import { SkillLevelCard } from '@/components/job-roles/skill-level-card';
 import { SkillAddModal } from '@/components/job-roles/skill-add-modal';
 import { Button } from '@/components/ui/button';
@@ -76,8 +77,18 @@ const levelToNumeric = (level: string | number): SkillLevel => {
 
 export function EditRoleSkillsModal({ role, isOpen, onClose, onSave }: EditRoleSkillsModalProps) {
   const { showToast } = useTopToast();
+  const normalizeSkill = (value: string) => value.trim().replace(/\s+/g, ' ').toLowerCase();
+  const applySkillAlias = (value: string) => {
+    if (value === 'excel' || value === 'ms excel') {
+      return 'microsoft excel';
+    }
+    return value;
+  };
+  const canonicalSkill = (value: string) => applySkillAlias(normalizeSkill(value));
   const [dbSkills, setDbSkills] = useState<SkillOption[]>([]);
   const [customSkills, setCustomSkills] = useState<string[]>([]);
+  const [hiddenSkills, setHiddenSkills] = useState<string[]>([]);
+  const [pendingDeleteSkill, setPendingDeleteSkill] = useState<string | null>(null);
   const [skillSearch, setSkillSearch] = useState('');
   const [skillLevels, setSkillLevels] = useState<SkillLevels>({});
   const [showAddSkillModal, setShowAddSkillModal] = useState(false);
@@ -96,14 +107,16 @@ export function EditRoleSkillsModal({ role, isOpen, onClose, onSave }: EditRoleS
     }
 
     return role.skills
-      .map((skill) => skill.skill_name?.trim() || skillNameById[skill.skill_id])
+      .map((skill) => canonicalSkill(skill.skill_name?.trim() || skillNameById[skill.skill_id] || ''))
       .filter((name): name is string => Boolean(name));
   }, [role, skillNameById]);
 
   const allSkills = useMemo(() => {
-    const dbSkillNames = dbSkills.map((skill) => skill.name);
-    return Array.from(new Set([...dbSkillNames, ...customSkills, ...preselectedSkillNames]));
-  }, [dbSkills, customSkills, preselectedSkillNames]);
+    const dbSkillNames = dbSkills.map((skill) => canonicalSkill(skill.name));
+    const hiddenSet = new Set(hiddenSkills.map((name) => canonicalSkill(name)));
+    return Array.from(new Set([...dbSkillNames, ...customSkills.map((name) => canonicalSkill(name)), ...preselectedSkillNames]))
+      .filter((name) => !hiddenSet.has(name));
+  }, [dbSkills, customSkills, hiddenSkills, preselectedSkillNames]);
 
   useEffect(() => {
     if (!isOpen) {
@@ -116,7 +129,7 @@ export function EditRoleSkillsModal({ role, isOpen, onClose, onSave }: EditRoleS
         const items = Array.isArray(skills)
           ? skills
               .map((skill: { id?: string; name?: string }) => {
-                const name = skill?.name?.trim();
+                const name = canonicalSkill(skill?.name || '');
                 const id = skill?.id?.trim();
                 if (!name || !id) {
                   return null;
@@ -142,7 +155,7 @@ export function EditRoleSkillsModal({ role, isOpen, onClose, onSave }: EditRoleS
 
     const nextLevels: SkillLevels = {};
     role.skills.forEach((skill) => {
-      const skillName = skill.skill_name?.trim() || skillNameById[skill.skill_id];
+      const skillName = canonicalSkill(skill.skill_name?.trim() || skillNameById[skill.skill_id] || '');
       if (!skillName) {
         return;
       }
@@ -191,36 +204,54 @@ export function EditRoleSkillsModal({ role, isOpen, onClose, onSave }: EditRoleS
   };
 
   const handleAddSkillFromModal = async ({
-    name,
+    names,
     level,
     makeGlobal,
   }: {
-    name: string;
+    names: string[];
     level: SkillLevel;
     makeGlobal: boolean;
   }) => {
+    const nextNames = names
+      .map((skill) => canonicalSkill(skill))
+      .filter(Boolean)
+      .filter((skill, index, arr) => arr.indexOf(skill) === index);
+
+    if (nextNames.length === 0) {
+      return;
+    }
+
     try {
-      await createSkill({
-        name,
-        is_global: makeGlobal,
+      await createSkillsBulk({
+        skills: nextNames,
+        level: level === 0 ? 'not_required' : level === 1 ? 'beginner' : level === 2 ? 'intermediate' : level === 3 ? 'advanced' : 'expert',
+        global: makeGlobal,
       });
     } catch {
       // Keep local skill support if backend create fails.
     }
 
-    setCustomSkills((prev) => (prev.includes(name) ? prev : [...prev, name]));
+    setCustomSkills((prev) => Array.from(new Set([...prev, ...nextNames])));
     setDbSkills((prev) => {
-      if (prev.some((item) => item.name.toLowerCase() === name.toLowerCase())) {
-        return prev;
-      }
-
-      return [...prev, { id: `custom-${name.toLowerCase().replace(/\s+/g, '-')}`, name }];
+      const existing = new Set(prev.map((item) => canonicalSkill(item.name)));
+      const additions = nextNames
+        .filter((name) => !existing.has(name))
+        .map((name) => ({ id: `custom-${name.replace(/\s+/g, '-')}`, name }));
+      return [...prev, ...additions];
     });
-    setSkillLevels((prev) => ({
-      ...prev,
-      [name]: level,
-    }));
+    setSkillLevels((prev) => {
+      const next = { ...prev };
+      for (const name of nextNames) {
+        next[name] = level;
+      }
+      return next;
+    });
     setShowAddSkillModal(false);
+    showToast({
+      message: `${nextNames.length} skill${nextNames.length > 1 ? 's' : ''} added`,
+      tone: 'success',
+      durationMs: 2000,
+    });
   };
 
   const handleSave = () => {
@@ -230,7 +261,7 @@ export function EditRoleSkillsModal({ role, isOpen, onClose, onSave }: EditRoleS
 
     const skills = Object.entries(skillLevels)
       .filter(([, level]) => level > 0)
-      .map(([name, required_level]) => ({ name, required_level }))
+      .map(([name, required_level]) => ({ name: canonicalSkill(name), required_level }))
       .map((skill) => ({ skill_name: skill.name, required_level: skill.required_level }));
 
     if (skills.length === 0) {
@@ -251,6 +282,39 @@ export function EditRoleSkillsModal({ role, isOpen, onClose, onSave }: EditRoleS
         behavior: 'smooth',
       });
     }
+  };
+
+  const handleDeleteSkill = async () => {
+    if (!pendingDeleteSkill) {
+      return;
+    }
+
+    const deletingSkill = canonicalSkill(pendingDeleteSkill);
+    const dbSkill = dbSkills.find((item) => canonicalSkill(item.name) === deletingSkill);
+
+    try {
+      if (dbSkill) {
+        await deleteSkill(dbSkill.id);
+      }
+    } catch (error) {
+      showToast({
+        message: error instanceof Error ? error.message : 'Failed to delete skill from database',
+        tone: 'error',
+      });
+      setPendingDeleteSkill(null);
+      return;
+    }
+
+    setHiddenSkills((prev) => Array.from(new Set([...prev, deletingSkill])));
+    setCustomSkills((prev) => prev.filter((skill) => canonicalSkill(skill) !== deletingSkill));
+    setDbSkills((prev) => prev.filter((item) => canonicalSkill(item.name) !== deletingSkill));
+    setSkillLevels((prev) => {
+      const next = { ...prev };
+      delete next[deletingSkill];
+      return next;
+    });
+    setPendingDeleteSkill(null);
+    showToast({ message: 'Skill deleted', tone: 'success' });
   };
 
   if (!isOpen || !role) {
@@ -318,6 +382,7 @@ export function EditRoleSkillsModal({ role, isOpen, onClose, onSave }: EditRoleS
                       skillName={skill}
                       value={(skillLevels[skill] || 0) as SkillLevel}
                       onChange={handleSkillLevelChange}
+                      onRequestDelete={setPendingDeleteSkill}
                     />
                   ))}
                 </div>
@@ -355,6 +420,16 @@ export function EditRoleSkillsModal({ role, isOpen, onClose, onSave }: EditRoleS
         onClose={() => setShowAddSkillModal(false)}
         onSubmit={handleAddSkillFromModal}
         existingSkills={allSkills}
+      />
+
+      <ConfirmModal
+        isOpen={Boolean(pendingDeleteSkill)}
+        onClose={() => setPendingDeleteSkill(null)}
+        onConfirm={handleDeleteSkill}
+        title="Delete skill?"
+        message={`This will remove ${pendingDeleteSkill || 'this skill'} from the visible list.`}
+        confirmLabel="Delete"
+        confirmIcon={<Trash2 className="h-4 w-4" />}
       />
     </div>
   );

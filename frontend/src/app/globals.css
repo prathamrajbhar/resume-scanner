@@ -216,6 +216,24 @@ button {
   animation: slide-down-in 260ms ease-out both, toast-welcome-glow 1200ms ease-out both;
 }
 
+.drawer-page-enter {
+  transform-origin: left center;
+  animation: drawer-page-enter 320ms cubic-bezier(0.2, 0.9, 0.2, 1) both;
+}
+
+.drawer-page-exit {
+  transform-origin: left center;
+  animation: drawer-page-exit 280ms cubic-bezier(0.55, 0.03, 0.67, 0.19) both;
+}
+
+.drawer-backdrop-enter {
+  animation: drawer-backdrop-enter 280ms ease-out both;
+}
+
+.drawer-backdrop-exit {
+  animation: drawer-backdrop-exit 220ms ease-in both;
+}
+
 .hero-grid {
   background-image:
     linear-gradient(to right, var(--app-grid-line) 1px, transparent 1px),
@@ -315,6 +333,46 @@ button {
   to {
     opacity: 1;
     transform: translateY(0) scale(1);
+  }
+}
+
+@keyframes drawer-page-enter {
+  from {
+    opacity: 0;
+    transform: perspective(1200px) translateX(48px) rotateY(-10deg) scaleX(0.86);
+  }
+  to {
+    opacity: 1;
+    transform: perspective(1200px) translateX(0) rotateY(0deg) scaleX(1);
+  }
+}
+
+@keyframes drawer-page-exit {
+  from {
+    opacity: 1;
+    transform: perspective(1200px) translateX(0) rotateY(0deg) scaleX(1);
+  }
+  to {
+    opacity: 0;
+    transform: perspective(1200px) translateX(46px) rotateY(-10deg) scaleX(0.88);
+  }
+}
+
+@keyframes drawer-backdrop-enter {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+@keyframes drawer-backdrop-exit {
+  from {
+    opacity: 1;
+  }
+  to {
+    opacity: 0;
   }
 }
 

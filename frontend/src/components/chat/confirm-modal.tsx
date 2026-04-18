@@ -12,6 +12,9 @@ type ConfirmModalProps = {
   message: string;
   confirmLabel?: string;
   confirmIcon?: ReactNode;
+  children?: ReactNode;
+  confirmDisabled?: boolean;
+  cancelDisabled?: boolean;
 };
 
 const ANIMATION_MS = 200;
@@ -36,6 +39,9 @@ export function ConfirmModal({
   message,
   confirmLabel = 'Delete',
   confirmIcon,
+  children,
+  confirmDisabled = false,
+  cancelDisabled = false,
 }: ConfirmModalProps) {
   const [isRendered, setIsRendered] = useState(isOpen);
   const [isClosing, setIsClosing] = useState(false);
@@ -133,6 +139,8 @@ export function ConfirmModal({
     return null;
   }
 
+  const resolvedConfirmIcon = confirmIcon === undefined ? <Trash2 className="h-4 w-4" /> : confirmIcon;
+
   return (
     <div
       className={`fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm px-4 transition-opacity duration-200 ease-out ${
@@ -145,10 +153,10 @@ export function ConfirmModal({
         aria-modal="true"
         aria-labelledby="confirm-modal-title"
         aria-describedby="confirm-modal-message"
-        className={`w-full max-w-[320px] ${dialogStateClasses} transform p-5 transition-all duration-200 ease-out`}
+        className={`w-full max-w-[380px] ${dialogStateClasses} transform p-5 transition-all duration-200 ease-out`}
       >
         <div className="flex items-start gap-3">
-          <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-[var(--app-danger-bg)] text-[var(--app-danger-text)]">
+          <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full border border-red-200 bg-red-50 text-red-500">
             <AlertTriangle className="h-5 w-5" />
           </div>
           <div className="min-w-0">
@@ -161,12 +169,14 @@ export function ConfirmModal({
           </div>
         </div>
 
+        {children ? <div>{children}</div> : null}
+
         <div className="mt-5 flex items-center justify-end gap-2">
-          <Button ref={cancelButtonRef} type="button" variant="secondary" onClick={onClose} className="rounded-xl">
+          <Button ref={cancelButtonRef} type="button" variant="secondary" onClick={onClose} className="rounded-xl" disabled={cancelDisabled}>
             Cancel
           </Button>
-          <Button type="button" onClick={onConfirm} className="rounded-xl bg-[var(--app-danger)] text-white hover:opacity-95 focus-visible:ring-[var(--app-danger)]">
-            {confirmIcon ?? <Trash2 className="h-4 w-4" />}
+          <Button type="button" onClick={onConfirm} className="rounded-xl border border-red-300 bg-white text-red-600 hover:bg-red-50 focus-visible:ring-red-300" disabled={confirmDisabled}>
+            {resolvedConfirmIcon}
             {confirmLabel}
           </Button>
         </div>

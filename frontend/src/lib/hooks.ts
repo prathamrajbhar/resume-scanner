@@ -64,7 +64,20 @@ export const useCreateJob = () => {
 export const useUpdateJob = () => {
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: ({ id, payload }: { id: string; payload: { title?: string; description?: string; skills: any[] } }) =>
+    mutationFn: ({
+      id,
+      payload,
+    }: {
+      id: string;
+      payload: {
+        title?: string;
+        description?: string;
+        auto_select_enabled?: boolean;
+        auto_select_threshold?: number;
+        require_hr_confirmation?: boolean;
+        skills: any[];
+      };
+    }) =>
       api.updateJob(id, payload),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['jobs'] });
@@ -108,6 +121,40 @@ export const useCandidate = (id: string) => {
     staleTime: 0,
     refetchOnMount: 'always',
     refetchOnWindowFocus: true,
+  });
+};
+
+export const useDeleteCandidate = () => {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: api.deleteCandidate,
+    onMutate: async (candidateId: string) => {
+      await queryClient.cancelQueries({ queryKey: ['candidates'] });
+
+      const candidateQueries = queryClient.getQueriesData({ queryKey: ['candidates'] });
+      for (const [queryKey, data] of candidateQueries) {
+        if (!Array.isArray(data)) {
+          continue;
+        }
+
+        queryClient.setQueryData(
+          queryKey,
+          data.filter((item: any) => String(item?.id || '') !== candidateId)
+        );
+      }
+
+      queryClient.removeQueries({ queryKey: ['candidates', candidateId], exact: true });
+      return { candidateQueries };
+    },
+    onError: (_error, _candidateId, context) => {
+      for (const [queryKey, data] of context?.candidateQueries || []) {
+        queryClient.setQueryData(queryKey, data);
+      }
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['candidates'] });
+    },
   });
 };
 

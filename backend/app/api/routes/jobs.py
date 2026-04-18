@@ -14,6 +14,9 @@ def serialize_job_role(job):
         "id": job.id,
         "title": job.title,
         "description": job.description,
+        "auto_select_enabled": bool(getattr(job, "auto_select_enabled", False)),
+        "auto_select_threshold": int(getattr(job, "auto_select_threshold", 70) or 70),
+        "require_hr_confirmation": bool(getattr(job, "require_hr_confirmation", True)),
         "created_by": created_by,
         "created_at": job.created_at,
         "skills": [
@@ -66,27 +69,142 @@ def resolve_job_skill_level(skill_data) -> str:
     return "expert"
 
 
+async def create_jobrole_for_user(
+    db: Prisma,
+    user_id: str,
+    title: str,
+    description: str | None,
+    auto_select_enabled: bool,
+    auto_select_threshold: int,
+    require_hr_confirmation: bool,
+):
+    attempts = [
+        {
+            "title": title,
+            "description": description,
+            "auto_select_enabled": auto_select_enabled,
+            "auto_select_threshold": auto_select_threshold,
+            "require_hr_confirmation": require_hr_confirmation,
+            "user": {"connect": {"id": user_id}},
+        },
+        {
+            "title": title,
+            "description": description,
+            "auto_select_enabled": auto_select_enabled,
+            "auto_select_threshold": auto_select_threshold,
+            "require_hr_confirmation": require_hr_confirmation,
+            "created_by": user_id,
+        },
+        {
+            "title": title,
+            "description": description,
+            "auto_select_enabled": auto_select_enabled,
+            "auto_select_threshold": auto_select_threshold,
+            "require_hr_confirmation": require_hr_confirmation,
+        },
+        {
+            "title": title,
+            "description": description,
+        },
+    ]
+
+    last_error: Exception | None = None
+    for data in attempts:
+        try:
+            return await db.jobrole.create(data=data)
+        except Exception as exc:
+            last_error = exc
+
+    raise RuntimeError(str(last_error) if last_error else "Failed to create job role")
+
+
+async def create_jobskill_link(db: Prisma, job_id: str, skill_id: str, level: str):
+    attempts = [
+        {
+            "job_id": job_id,
+            "skill_id": skill_id,
+            "level": level,
+        },
+        {
+            "job": {"connect": {"id": job_id}},
+            "skill": {"connect": {"id": skill_id}},
+            "level": level,
+        },
+    ]
+
+    last_error: Exception | None = None
+    for data in attempts:
+        try:
+            return await db.jobskill.create(data=data)
+        except Exception as exc:
+            last_error = exc
+
+    raise RuntimeError(str(last_error) if last_error else "Failed to create job-skill link")
+
+
+def normalize_skill_name(raw_value: str) -> str:
+    return " ".join(str(raw_value or "").strip().split()).lower()
+
+
+def apply_skill_alias(normalized_name: str) -> str:
+    alias_map = {
+        "ms excel": "microsoft excel",
+        "excel": "microsoft excel",
+    }
+    return alias_map.get(normalized_name, normalized_name)
+
+
+async def find_existing_skill_case_insensitive(db: Prisma, normalized_name: str):
+    all_skills = await db.skill.find_many()
+    for item in all_skills:
+        if normalize_skill_name(getattr(item, "name", "")) == normalized_name:
+            return item
+    return None
+
+
 def get_or_create_skill_id(skill_data, current_user, db: Prisma):
     async def _resolve():
         skill_id = skill_data.skill_id
         if skill_id:
             return skill_id
 
-        skill_name = (skill_data.skill_name or "").strip()
+        skill_name = apply_skill_alias(normalize_skill_name(skill_data.skill_name or ""))
         if not skill_name:
             return None
 
-        existing_skill = await db.skill.find_unique(where={"name": skill_name})
+        existing_skill = await find_existing_skill_case_insensitive(db, skill_name)
         if existing_skill:
             return existing_skill.id
 
-        created_skill = await db.skill.create(
-            data={
+        create_attempts = [
+            {
                 "name": skill_name,
-                "created_by": current_user.id,
                 "is_global": True,
-            }
-        )
+                "user": {"connect": {"id": current_user.id}},
+            },
+            {
+                "name": skill_name,
+                "is_global": True,
+                "created_by": current_user.id,
+            },
+            {
+                "name": skill_name,
+                "is_global": True,
+            },
+        ]
+
+        created_skill = None
+        last_error: Exception | None = None
+        for payload in create_attempts:
+            try:
+                created_skill = await db.skill.create(data=payload)
+                break
+            except Exception as exc:
+                last_error = exc
+
+        if not created_skill:
+            raise RuntimeError(str(last_error) if last_error else "Failed to create skill")
+
         return created_skill.id
 
     return _resolve()
@@ -125,28 +243,38 @@ async def create_job(
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="At least one skill is required")
 
     # Create the job role
-    new_job = await db.jobrole.create(
-        data={
-            "title": job.title.strip(),
-            "description": job.description,
-            "created_by": current_user.id,
-        }
-    )
+    try:
+        new_job = await create_jobrole_for_user(
+            db=db,
+            user_id=current_user.id,
+            title=job.title.strip(),
+            description=job.description,
+            auto_select_enabled=job.auto_select_enabled,
+            auto_select_threshold=max(0, min(100, int(job.auto_select_threshold))),
+            require_hr_confirmation=job.require_hr_confirmation,
+        )
+    except Exception as exc:
+        raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail=f"Failed to create job role: {exc}")
     
     # Associate skills
+    added_skill_ids = set()
     for skill_data in job.skills:
         skill_id = await get_or_create_skill_id(skill_data, current_user, db)
 
-        if not skill_id:
+        if not skill_id or skill_id in added_skill_ids:
             continue
 
-        await db.jobskill.create(
-            data={
-                "job_id": new_job.id,
-                "skill_id": skill_id,
-                "level": resolve_job_skill_level(skill_data),
-            }
-        )
+        added_skill_ids.add(skill_id)
+
+        try:
+            await create_jobskill_link(
+                db=db,
+                job_id=new_job.id,
+                skill_id=skill_id,
+                level=resolve_job_skill_level(skill_data),
+            )
+        except Exception as exc:
+            raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail=f"Failed to save job skills: {exc}")
 
     created_job = await db.jobrole.find_unique(
         where={"id": new_job.id},
@@ -184,23 +312,50 @@ async def update_job(
     if job.description is not None:
         update_data["description"] = job.description
 
+    if job.auto_select_enabled is not None:
+        update_data["auto_select_enabled"] = bool(job.auto_select_enabled)
+
+    if job.auto_select_threshold is not None:
+        update_data["auto_select_threshold"] = max(0, min(100, int(job.auto_select_threshold)))
+
+    if job.require_hr_confirmation is not None:
+        update_data["require_hr_confirmation"] = bool(job.require_hr_confirmation)
+
     if update_data:
-        await db.jobrole.update(where={"id": job_id}, data=update_data)
+        try:
+            await db.jobrole.update(where={"id": job_id}, data=update_data)
+        except Exception as exc:
+            message = str(exc).lower()
+            if any(item in message for item in ["unknown argument", "could not find field", "field does not exist"]):
+                compatibility_data = {
+                    key: value
+                    for key, value in update_data.items()
+                    if key not in {"auto_select_enabled", "auto_select_threshold", "require_hr_confirmation"}
+                }
+                if compatibility_data:
+                    await db.jobrole.update(where={"id": job_id}, data=compatibility_data)
+            else:
+                raise
 
     await db.jobskill.delete_many(where={"job_id": job_id})
 
+    added_skill_ids = set()
     for skill_data in job.skills:
         skill_id = await get_or_create_skill_id(skill_data, current_user, db)
-        if not skill_id:
+        if not skill_id or skill_id in added_skill_ids:
             continue
 
-        await db.jobskill.create(
-            data={
-                "job_id": job_id,
-                "skill_id": skill_id,
-                "level": resolve_job_skill_level(skill_data),
-            }
-        )
+        added_skill_ids.add(skill_id)
+
+        try:
+            await create_jobskill_link(
+                db=db,
+                job_id=job_id,
+                skill_id=skill_id,
+                level=resolve_job_skill_level(skill_data),
+            )
+        except Exception as exc:
+            raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail=f"Failed to save job skills: {exc}")
 
     updated_job = await db.jobrole.find_unique(
         where={"id": job_id},
@@ -222,5 +377,6 @@ async def delete_job(job_id: str, current_user = Depends(get_current_user), db: 
         raise HTTPException(status_code=404, detail="Job not found")
 
     await db.analysis.delete_many(where={"job_id": job_id})
+    await db.shortlistedcandidate.delete_many(where={"job_id": job_id})
     await db.jobskill.delete_many(where={"job_id": job_id})
     await db.jobrole.delete(where={"id": job_id})

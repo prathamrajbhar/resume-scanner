@@ -12,7 +12,8 @@ from app.api.routes import (
     jobs, 
     analysis, 
     chat, 
-    users
+    users,
+    send_email,
 )
 
 app = FastAPI(
@@ -57,6 +58,7 @@ app.include_router(jobs.router, prefix="/api/jobs", tags=["jobs"])
 app.include_router(analysis.router, prefix="/api/analysis", tags=["analysis"])
 app.include_router(chat.router, prefix="/api/chat", tags=["chat"])
 app.include_router(users.router, prefix="/api/users", tags=["users"])
+app.include_router(send_email.router, tags=["email"])
 
 @app.get("/")
 def read_root():

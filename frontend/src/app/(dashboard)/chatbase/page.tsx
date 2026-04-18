@@ -3,7 +3,7 @@
 import { ChangeEvent, useEffect, useMemo, useRef, useState } from 'react';
 import Image from 'next/image';
 import { useRouter } from 'next/navigation';
-import { ArrowLeft, LogOut, MessageSquarePlus, PanelLeft, Settings, User as UserIcon } from 'lucide-react';
+import { ArrowLeft, LogOut, Mail, MessageSquarePlus, PanelLeft, Settings, User as UserIcon } from 'lucide-react';
 import { getCandidates, getJobById, runAnalysisForResumes, shortlistCandidate, uploadResumes } from '@/lib/api';
 import { CandidateDetailData, CandidateDetailModal } from '@/components/analyze/CandidateDetailModal';
 import { AnalysisButton } from '@/components/chat/analysis-button';
@@ -36,6 +36,7 @@ type ResultCard = {
   skills_with_percentage: { skill: string; percentage: number; is_na?: boolean }[];
   required_skills: { skill: string; level?: string }[];
   candidate_id?: string;
+  candidate_email?: string;
   is_shortlisted?: boolean;
   shortlisted_type?: 'select' | 'final_select' | null;
 };
@@ -50,6 +51,11 @@ type ChatSession = {
   selected_job: string;
   has_run: boolean;
   results: ResultCard[];
+};
+
+type PendingSelection = {
+  candidate: ResultCard;
+  selectionType: 'select' | 'final_select';
 };
 
 const generateId = () => `${Date.now()}-${Math.random().toString(16).slice(2)}`;
@@ -173,6 +179,7 @@ const hydrateSessions = (raw: unknown): ChatSession[] => {
                     .filter((entry: { skill: string; level?: string }) => Boolean(entry.skill))
                 : [],
               candidate_id: typeof result?.candidate_id === 'string' ? result.candidate_id : undefined,
+              candidate_email: typeof result?.candidate_email === 'string' ? result.candidate_email : undefined,
               is_shortlisted: Boolean(result?.is_shortlisted),
               shortlisted_type:
                 result?.shortlisted_type === 'final_select' || result?.shortlisted_type === 'select'
@@ -224,6 +231,29 @@ const normalizeName = (value: string) =>
     .replace(/\s+/g, ' ')
     .trim();
 
+const normalizeSkillToken = (value: string) => {
+  const normalized = value
+    .toLowerCase()
+    .replace(/[^a-z0-9\s]/g, ' ')
+    .replace(/\s+/g, ' ')
+    .trim();
+
+  const aliasMap: Record<string, string> = {
+    'excel': 'microsoft excel',
+    'ms excel': 'microsoft excel',
+    'word': 'microsoft word',
+    'ms word': 'microsoft word',
+    'powerpoint': 'microsoft powerpoint',
+    'ms powerpoint': 'microsoft powerpoint',
+    'communication skills': 'communication',
+    'problem solving': 'problem solving',
+    'problem-solving': 'problem solving',
+    'cybersecurity protocols': 'cybersecurity',
+  };
+
+  return aliasMap[normalized] || normalized;
+};
+
 export default function ChatbasePage() {
   const router = useRouter();
   const setupFileInputRef = useRef<HTMLInputElement | null>(null);
@@ -253,10 +283,16 @@ export default function ChatbasePage() {
   const [statusMessage, setStatusMessage] = useState<string | null>(null);
   const [showAllCandidates, setShowAllCandidates] = useState(false);
   const [selectedCandidate, setSelectedCandidate] = useState<CandidateDetailData | null>(null);
+  const [liveCandidateIds, setLiveCandidateIds] = useState<string[]>([]);
+  const [liveCandidateIdByName, setLiveCandidateIdByName] = useState<Record<string, string>>({});
+  const [liveCandidateEmailById, setLiveCandidateEmailById] = useState<Record<string, string>>({});
   const [isDetailModalOpen, setIsDetailModalOpen] = useState(false);
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
   const [isProfileOpen, setIsProfileOpen] = useState(false);
   const [isSignOutConfirmOpen, setIsSignOutConfirmOpen] = useState(false);
+  const [pendingSelection, setPendingSelection] = useState<PendingSelection | null>(null);
+  const [sendSelectionEmail, setSendSelectionEmail] = useState(true);
+  const [selectionSubmitting, setSelectionSubmitting] = useState(false);
   const [storageReady, setStorageReady] = useState(false);
   const accountMenuRef = useRef<HTMLDivElement | null>(null);
   const liveJobs = useMemo(
@@ -599,7 +635,7 @@ export default function ChatbasePage() {
       const requiredSkills = Array.isArray(latestJob.skills)
         ? latestJob.skills
             .map((entry: any) => ({
-              skill: String(entry?.skill_name || '').toLowerCase().trim(),
+              skill: normalizeSkillToken(String(entry?.skill_name || '')),
               level: typeof entry?.level === 'string' ? entry.level : undefined,
             }))
             .filter((entry: { skill: string; level?: string }) => Boolean(entry.skill))
@@ -632,14 +668,18 @@ export default function ChatbasePage() {
         const shortlistEntries = Array.isArray(candidateMeta?.shortlist_entries) ? candidateMeta.shortlist_entries : [];
         const shortlistForRole = shortlistEntries.find((entry: any) => entry?.role_id === String(latestJob.id));
         const matchedSkills = Array.isArray(candidate?.matched_skills)
-          ? candidate.matched_skills.filter((skill: unknown) => typeof skill === 'string')
+          ? candidate.matched_skills
+              .filter((skill: unknown) => typeof skill === 'string')
+              .map((skill: string) => normalizeSkillToken(skill))
           : [];
         const missingSkills = Array.isArray(candidate?.missing_skills)
-          ? candidate.missing_skills.filter((skill: unknown) => typeof skill === 'string')
+          ? candidate.missing_skills
+              .filter((skill: unknown) => typeof skill === 'string')
+              .map((skill: string) => normalizeSkillToken(skill))
           : [];
 
         const requiredSkillNames = requiredSkills.map((entry: { skill: string }) => entry.skill);
-        const normalizedMatched = matchedSkills.map((skill: string) => skill.toLowerCase().trim());
+        const normalizedMatched = matchedSkills.map((skill: string) => normalizeSkillToken(skill));
         const mergedMissing = Array.from(
           new Set([
             ...missingSkills,
@@ -676,6 +716,10 @@ export default function ChatbasePage() {
           skills_with_percentage: competencyRows,
           required_skills: requiredSkills,
           candidate_id: candidatesByNormalizedName.get(normalizedCandidateName),
+          candidate_email:
+            typeof candidateMeta?.email === 'string' && candidateMeta.email.trim()
+              ? candidateMeta.email.trim()
+              : undefined,
           is_shortlisted: Boolean(shortlistForRole),
           shortlisted_type:
             shortlistForRole?.selection_type === 'final_select' || shortlistForRole?.selection_type === 'select'
@@ -739,8 +783,144 @@ export default function ChatbasePage() {
 
   const canRunAnalysis = selectedJobId.trim().length > 0 && selectedFiles.length > 0 && !sending && !uploading;
   const hasAnalysisRun = Boolean(activeSession?.has_run);
-  const topCandidates = activeSession?.results || [];
+  const topCandidates = useMemo(() => {
+    const results = activeSession?.results || [];
+    if (results.length === 0) {
+      return [] as ResultCard[];
+    }
+
+    const idSet = new Set(liveCandidateIds);
+    if (idSet.size === 0) {
+      return [] as ResultCard[];
+    }
+
+    return results
+      .map((result) => {
+        const directId = typeof result.candidate_id === 'string' ? result.candidate_id : undefined;
+        const resolvedId =
+          directId && idSet.has(directId)
+            ? directId
+            : liveCandidateIdByName[normalizeName(result.candidate_name)] || undefined;
+
+        if (!resolvedId || !idSet.has(resolvedId)) {
+          return null;
+        }
+
+        const hydratedEmail =
+          result.candidate_email ||
+          (resolvedId ? liveCandidateEmailById[resolvedId] : undefined);
+
+        if (result.candidate_id !== resolvedId || result.candidate_email !== hydratedEmail) {
+          return {
+            ...result,
+            candidate_id: resolvedId,
+            candidate_email: hydratedEmail,
+          };
+        }
+
+        return result;
+      })
+      .filter((result): result is ResultCard => Boolean(result));
+  }, [activeSession?.results, liveCandidateIds, liveCandidateIdByName, liveCandidateEmailById]);
   const visibleCandidates = showAllCandidates ? topCandidates : topCandidates.slice(0, 5);
+
+  useEffect(() => {
+    if (!hasAnalysisRun) {
+      setLiveCandidateIds([]);
+      setLiveCandidateIdByName({});
+      setLiveCandidateEmailById({});
+      return;
+    }
+
+    let isActive = true;
+
+    (async () => {
+      try {
+        const allCandidates = await getCandidates();
+        if (!isActive) {
+          return;
+        }
+
+        const ids: string[] = [];
+        const byName: Record<string, string> = {};
+        const emailById: Record<string, string> = {};
+
+        for (const candidate of allCandidates) {
+          const id = String(candidate?.id || '');
+          if (!id) {
+            continue;
+          }
+
+          ids.push(id);
+          const key = normalizeName(String(candidate?.full_name || ''));
+          if (key && !byName[key]) {
+            byName[key] = id;
+          }
+          const email = typeof candidate?.email === 'string' ? candidate.email.trim() : '';
+          if (email) {
+            emailById[id] = email;
+          }
+        }
+
+        setLiveCandidateIds(ids);
+        setLiveCandidateIdByName(byName);
+        setLiveCandidateEmailById(emailById);
+      } catch {
+        if (!isActive) {
+          return;
+        }
+
+        setLiveCandidateIds([]);
+        setLiveCandidateIdByName({});
+        setLiveCandidateEmailById({});
+      }
+    })();
+
+    return () => {
+      isActive = false;
+    };
+  }, [hasAnalysisRun, activeSession?.id]);
+
+  const pendingSelectionEmail = useMemo(() => {
+    if (!pendingSelection) {
+      return null;
+    }
+
+    const directEmail =
+      typeof pendingSelection.candidate.candidate_email === 'string'
+        ? pendingSelection.candidate.candidate_email.trim()
+        : '';
+    if (directEmail) {
+      return directEmail;
+    }
+
+    const candidateId = pendingSelection.candidate.candidate_id;
+    if (candidateId && liveCandidateEmailById[candidateId]) {
+      return liveCandidateEmailById[candidateId];
+    }
+
+    return null;
+  }, [pendingSelection, liveCandidateEmailById]);
+
+  useEffect(() => {
+    if (!activeSession || activeSession.results.length === 0 || topCandidates.length === 0) {
+      return;
+    }
+
+    const hasDifferentLength = topCandidates.length !== activeSession.results.length;
+    const hasCandidateIdChanges = topCandidates.some(
+      (candidate, index) => candidate.candidate_id !== activeSession.results[index]?.candidate_id
+    );
+
+    if (!hasDifferentLength && !hasCandidateIdChanges) {
+      return;
+    }
+
+    mutateActiveSession((session) => ({
+      ...session,
+      results: topCandidates,
+    }));
+  }, [topCandidates, activeSession]);
 
   const getCardHighlightClass = (rank: number) => {
     if (rank === 1) {
@@ -764,15 +944,28 @@ export default function ChatbasePage() {
     candidate: ResultCard,
     selectionType: 'select' | 'final_select'
   ) => {
-    if (!candidate.candidate_id || !activeSession?.selected_job_id) {
-      setError('Candidate cannot be shortlisted because role or candidate id is missing.');
+    setPendingSelection({ candidate, selectionType });
+    setSendSelectionEmail(true);
+  };
+
+  const confirmShortlistCandidate = async () => {
+    if (!pendingSelection) {
       return;
     }
 
+    const { candidate, selectionType } = pendingSelection;
+    if (!candidate.candidate_id || !activeSession?.selected_job_id) {
+      setError('Candidate cannot be shortlisted because role or candidate id is missing.');
+      setPendingSelection(null);
+      return;
+    }
+
+    setSelectionSubmitting(true);
     try {
-      await shortlistCandidate(candidate.candidate_id, {
+      const response = await shortlistCandidate(candidate.candidate_id, {
         role_id: activeSession.selected_job_id,
         selection_type: selectionType,
+        send_selection_email: sendSelectionEmail,
       });
 
       mutateActiveSession((session) => ({
@@ -787,8 +980,19 @@ export default function ChatbasePage() {
             : item
         ),
       }));
+
+      if (sendSelectionEmail) {
+        const sent = Boolean(response?.email_sent);
+        setStatusMessage(sent ? 'Candidate selected and email sent.' : 'Candidate selected. Email was not sent.');
+      } else {
+        setStatusMessage('Candidate selected without email notification.');
+      }
+
+      setPendingSelection(null);
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to shortlist candidate.');
+    } finally {
+      setSelectionSubmitting(false);
     }
   };
 
@@ -827,17 +1031,7 @@ export default function ChatbasePage() {
         <div ref={accountMenuRef} className="relative mt-auto">
           {accountMenuOpen ? (
             <div className="dropdown-pop absolute bottom-[calc(100%+10px)] left-0 w-[304px] rounded-2xl border border-[var(--app-border)] bg-[var(--app-surface-elevated)] p-4 shadow-[var(--app-shadow-md)] transition duration-200 hover:scale-[1.02]">
-              <div className="flex items-center gap-3 rounded-xl bg-gradient-to-r from-blue-50 to-indigo-50 p-3">
-                <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-blue-500 text-sm font-semibold text-white">
-                  {userInitials}
-                </div>
-                <div className="min-w-0">
-                  <p className="truncate text-sm font-semibold text-[var(--app-text)]">{currentUser?.full_name || 'Name unavailable'}</p>
-                  <p className="truncate text-xs text-[var(--app-muted)]">{currentUser?.email || 'Email unavailable'}</p>
-                </div>
-              </div>
-
-              <div className="my-2 border-t border-[var(--app-border)]" />
+              <p className="px-1 pb-2 text-xs font-medium uppercase tracking-wide text-[var(--app-muted)]">Account</p>
 
               <div className="space-y-1">
                 <button
@@ -925,6 +1119,43 @@ export default function ChatbasePage() {
         confirmLabel="Sign out"
         confirmIcon={<LogOut className="h-4 w-4" />}
       />
+
+      <ConfirmModal
+        isOpen={Boolean(pendingSelection)}
+        onClose={() => {
+          if (selectionSubmitting) {
+            return;
+          }
+          setPendingSelection(null);
+        }}
+        onConfirm={confirmShortlistCandidate}
+        title={pendingSelection?.selectionType === 'final_select' ? 'Final select candidate?' : 'Select candidate?'}
+        message={pendingSelection ? `${pendingSelection.candidate.candidate_name} will be marked for this role.` : ''}
+        confirmLabel={selectionSubmitting ? 'Saving...' : 'Confirm'}
+        confirmIcon={null}
+        confirmDisabled={selectionSubmitting}
+        cancelDisabled={selectionSubmitting}
+      >
+        {sendSelectionEmail ? (
+          <div className="mt-3 rounded-md border border-blue-200 bg-blue-50 px-3 py-2 text-xs text-blue-700">
+            <p className="flex items-center gap-1.5 font-medium">
+              <Mail className="h-3.5 w-3.5" />
+              Mail will be sent to:
+            </p>
+            <p className="mt-1 break-all">{pendingSelectionEmail || 'Candidate email is not available'}</p>
+          </div>
+        ) : null}
+        <label className="mt-3 flex cursor-pointer items-center gap-2 text-sm text-[var(--app-text)]">
+          <input
+            type="checkbox"
+            className="h-4 w-4"
+            checked={sendSelectionEmail}
+            onChange={(event) => setSendSelectionEmail(event.target.checked)}
+            disabled={selectionSubmitting}
+          />
+          Send selection email to candidate
+        </label>
+      </ConfirmModal>
 
       <ProfileTabsModal isOpen={isProfileOpen} onClose={() => setIsProfileOpen(false)} />
 

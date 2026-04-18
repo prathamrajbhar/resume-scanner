@@ -29,13 +29,25 @@ model Skill {
   is_global  Boolean  @default(true)
   created_at DateTime @default(now())
   user       User?    @relation(fields: [created_by], references: [id])
+  aliases    SkillAlias[]
   job_skills JobSkill[]
+}
+
+model SkillAlias {
+  id         String   @id @default(uuid())
+  alias      String   @unique
+  skill_id   String
+  created_at DateTime @default(now())
+  skill      Skill    @relation(fields: [skill_id], references: [id])
 }
 
 model JobRole {
   id          String   @id @default(uuid())
   title       String
   description String?
+  auto_select_enabled Boolean @default(false)
+  auto_select_threshold Int @default(70)
+  require_hr_confirmation Boolean @default(true)
   created_by  String?
   created_at  DateTime @default(now())
   user        User?    @relation(fields: [created_by], references: [id])
@@ -58,6 +70,10 @@ model Resume {
   parsed_data       Json?
   content_text      String
   uploaded_by       String
+  auto_selected     Boolean   @default(false)
+  selected          Boolean   @default(false)
+  selection_status  String    @default("rejected")
+  is_deleted        Boolean   @default(false)
   created_at        DateTime  @default(now())
   user              User      @relation(fields: [uploaded_by], references: [id])
   analyses          Analysis[]
@@ -68,6 +84,29 @@ model Analysis {
   job_id         String
   resume_id      String
   score          Float
+  cgpa           Float?
+  cgpa_or_percentage Float?
+  percentage     Float?
+  education_degree String?
+  degree_relevance Float   @default(0)
+  total_experience_years Float?
+  relevant_experience_years Float?
+  required_experience_years Float @default(1)
+  matched_skill_count Int    @default(0)
+  required_skill_count Int   @default(0)
+  projects_count Int         @default(0)
+  communication_score Float  @default(0)
+  leadership_score Float     @default(0)
+  teamwork_score Float       @default(0)
+  problem_solving_score Float @default(0)
+  academic_score Float       @default(0)
+  experience_score Float     @default(0)
+  skill_match_score Float    @default(0)
+  project_score Float        @default(0)
+  soft_skill_score Float     @default(0)
+  final_score    Float       @default(0)
+  soft_skills    Json?
+  normalized_skills Json?
   matched_skills Json?
   missing_skills Json?
   created_at     DateTime @default(now())

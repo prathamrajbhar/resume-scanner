@@ -90,6 +90,24 @@ docker-compose up --build
 - **Candidate Comparison**: Detailed side-by-side view with scoring breakdown.
 - **Google Drive Storage**: Secure cloud storage for all parsed resumes.
 
+## Screenshots
+
+### Login Page
+![Login Page](public/screenshots/01-login-page.png)
+*User authentication page with Google OAuth and email/password login options.*
+
+### Dashboard
+![Dashboard](public/screenshots/02-dashboard.png)
+*Main dashboard displaying overview statistics, recent candidates, and quick actions.*
+
+### Chatbase Page
+![Chatbase](public/screenshots/03-chatbase-page.png)
+*AI-powered chat interface for asking questions about candidates and job descriptions.*
+
+### Analytics Page
+![Analytics](public/screenshots/04-analytics-page.png)
+*Detailed analytics and insights with candidate scoring breakdown and comparisons.*
+
 ## API Documentation
 Once the backend is running, access the interactive docs at:
 `http://localhost:8000/docs`

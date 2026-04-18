@@ -2,19 +2,16 @@
 
 import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { Trash2, X } from 'lucide-react';
+import { AlertTriangle, Trash2, X } from 'lucide-react';
 import { ConfirmModal } from '@/components/chat/confirm-modal';
 import { useTopToast } from '@/components/ui/top-toast';
-import { deleteAccount, updateProfile } from '@/lib/api';
+import { deleteAccount, deleteAllCandidates, deleteAllJobs, updateProfile } from '@/lib/api';
 import {
-  applyStoredTheme,
   clearStoredAuth,
   clearStoredChats,
   setProfileSetupRequired,
-  defaultSettings,
   getStoredUser,
   setStoredUser,
-  setStoredSettings,
 } from '@/lib/storage';
 
 type ProfileTab = 'account' | 'memory';
@@ -30,6 +27,8 @@ export function ProfileTabsModal({ isOpen, onClose }: ProfileTabsModalProps) {
   const [activeTab, setActiveTab] = useState<ProfileTab>('account');
   const [isDeleteAccountConfirmOpen, setIsDeleteAccountConfirmOpen] = useState(false);
   const [isDeletingAccount, setIsDeletingAccount] = useState(false);
+  const [memoryAction, setMemoryAction] = useState<null | 'delete-candidates' | 'delete-jobs'>(null);
+  const [isDeletingMemoryData, setIsDeletingMemoryData] = useState(false);
   const [name, setName] = useState('');
   const [status, setStatus] = useState<string | null>(null);
 
@@ -71,6 +70,7 @@ export function ProfileTabsModal({ isOpen, onClose }: ProfileTabsModalProps) {
     if (!isOpen) {
       setActiveTab('account');
       setIsDeleteAccountConfirmOpen(false);
+      setMemoryAction(null);
     }
   }, [isOpen]);
 
@@ -150,24 +150,38 @@ export function ProfileTabsModal({ isOpen, onClose }: ProfileTabsModalProps) {
     }
   };
 
-  const handleClearChatHistory = () => {
-    const confirmed = window.confirm('Delete all previous chats and analysis data?');
-    if (!confirmed) {
+  const confirmMemoryAction = async () => {
+    if (!memoryAction || isDeletingMemoryData) {
       return;
     }
 
-    clearStoredChats();
-  };
+    setIsDeletingMemoryData(true);
+    setStatus(null);
 
-  const handleResetAiMemory = () => {
-    const confirmed = window.confirm('Clear saved preferences and interactions?');
-    if (!confirmed) {
-      return;
+    try {
+      if (memoryAction === 'delete-candidates') {
+        const result = await deleteAllCandidates();
+        setStatus(`Deleted ${result.deleted_candidates} candidates.`);
+        showToast({
+          message: `Deleted ${result.deleted_candidates} candidates`,
+          tone: 'success',
+          durationMs: 2200,
+        });
+      } else {
+        const result = await deleteAllJobs();
+        setStatus(`Deleted ${result.deleted_jobs} jobs.`);
+        showToast({
+          message: `Deleted ${result.deleted_jobs} jobs`,
+          tone: 'success',
+          durationMs: 2200,
+        });
+      }
+    } catch (error) {
+      setStatus(error instanceof Error ? error.message : 'Failed to delete data.');
+    } finally {
+      setIsDeletingMemoryData(false);
+      setMemoryAction(null);
     }
-
-    clearStoredChats();
-    setStoredSettings(defaultSettings);
-    applyStoredTheme();
   };
 
   return (
@@ -259,11 +273,14 @@ export function ProfileTabsModal({ isOpen, onClose }: ProfileTabsModalProps) {
 
                 <div>
                   <p className="text-lg font-medium text-gray-900">Delete account</p>
-                  <p className="mt-1 text-sm text-gray-500">Permanently remove your account and local app data.</p>
+                  <p className="mt-1 flex items-center gap-1.5 text-sm text-red-500">
+                    <AlertTriangle className="h-3.5 w-3.5" />
+                    Permanently remove your account and local app data.
+                  </p>
                   <button
                     type="button"
                     onClick={() => setIsDeleteAccountConfirmOpen(true)}
-                    className="bg-red-500 hover:bg-red-600 text-white rounded-lg px-4 py-2 mt-3"
+                    className="mt-3 rounded-lg border border-red-300 bg-white px-4 py-2 text-red-600 hover:bg-red-50"
                   >
                     Delete account
                   </button>
@@ -279,29 +296,37 @@ export function ProfileTabsModal({ isOpen, onClose }: ProfileTabsModalProps) {
               <div className="space-y-6">
                 <h3 className="text-xl font-semibold text-gray-900">Memory</h3>
 
-                <div className="rounded-xl border border-gray-200 bg-white p-4">
-                  <p className="text-base font-medium text-gray-900">Clear Chat History</p>
-                  <p className="mt-1 text-sm text-gray-500">Delete all previous chats and analysis data</p>
+                <div className="rounded-xl border border-red-200 bg-white p-4">
+                  <p className="text-base font-medium text-gray-900">Delete Candidates</p>
+                  <p className="mt-1 flex items-center gap-1.5 text-sm text-red-500">
+                    <AlertTriangle className="h-3.5 w-3.5" />
+                    Delete all candidates and their analysis data.
+                  </p>
                   <button
                     type="button"
-                    onClick={handleClearChatHistory}
-                    className="bg-gray-100 hover:bg-gray-200 text-gray-800 px-4 py-2 rounded-lg mt-3"
+                    onClick={() => setMemoryAction('delete-candidates')}
+                    className="mt-3 rounded-lg border border-red-300 bg-white px-4 py-2 text-red-600 hover:bg-red-50"
                   >
-                    Clear chat history
+                    Delete all candidates
                   </button>
                 </div>
 
-                <div className="rounded-xl border border-gray-200 bg-white p-4">
-                  <p className="text-base font-medium text-gray-900">Reset AI Memory</p>
-                  <p className="mt-1 text-sm text-gray-500">Clear saved preferences and interactions</p>
+                <div className="rounded-xl border border-red-200 bg-white p-4">
+                  <p className="text-base font-medium text-gray-900">Delete Jobs</p>
+                  <p className="mt-1 flex items-center gap-1.5 text-sm text-red-500">
+                    <AlertTriangle className="h-3.5 w-3.5" />
+                    Delete all jobs and related ranking data.
+                  </p>
                   <button
                     type="button"
-                    onClick={handleResetAiMemory}
-                    className="bg-gray-100 hover:bg-gray-200 text-gray-800 px-4 py-2 rounded-lg mt-3"
+                    onClick={() => setMemoryAction('delete-jobs')}
+                    className="mt-3 rounded-lg border border-red-300 bg-white px-4 py-2 text-red-600 hover:bg-red-50"
                   >
-                    Reset AI memory
+                    Delete all jobs
                   </button>
                 </div>
+
+                {status ? <p className="text-sm text-gray-600">{status}</p> : null}
               </div>
             </div>
           </div>
@@ -315,6 +340,24 @@ export function ProfileTabsModal({ isOpen, onClose }: ProfileTabsModalProps) {
         title="Delete account?"
         message="Delete account and all local data? This action cannot be undone."
         confirmLabel="Delete account"
+        confirmIcon={<Trash2 className="h-4 w-4" />}
+      />
+
+      <ConfirmModal
+        isOpen={memoryAction !== null}
+        onClose={() => {
+          if (!isDeletingMemoryData) {
+            setMemoryAction(null);
+          }
+        }}
+        onConfirm={confirmMemoryAction}
+        title={memoryAction === 'delete-jobs' ? 'Delete all jobs?' : 'Delete all candidates?'}
+        message={
+          memoryAction === 'delete-jobs'
+            ? 'This will permanently remove all jobs and related analysis data.'
+            : 'This will permanently remove all candidates and related analysis data.'
+        }
+        confirmLabel={isDeletingMemoryData ? 'Deleting...' : 'Delete now'}
         confirmIcon={<Trash2 className="h-4 w-4" />}
       />
     </div>

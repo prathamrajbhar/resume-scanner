@@ -65,8 +65,18 @@ export interface Candidate {
   }>;
   is_shortlisted?: boolean;
   selected_type?: string | null;
+  auto_selected?: boolean;
+  selected?: boolean;
+  selection_status?: 'pending' | 'confirmed' | 'rejected' | string;
   total_experience: number | null;
+  total_experience_years?: number | null;
   education: string | null;
+  degrees?: Array<{ degree?: string | null; field?: string | null; cgpa?: number | null; college?: string | null; location?: string | null }>;
+  experience_list?: Array<{ role?: string | null; duration?: string | null }>;
+  projects?: string[];
+  certifications?: string[];
+  awards?: string[];
+  soft_skills?: string[];
 }
 
 export interface GmailFetchResponse {

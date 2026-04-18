@@ -13,6 +13,9 @@ type RoleWithSkills = {
   id: string;
   title: string;
   description?: string;
+  auto_select_enabled?: boolean;
+  auto_select_threshold?: number;
+  require_hr_confirmation?: boolean;
   skills: Array<{
     skill_id: string;
     skill_name?: string;
@@ -29,34 +32,34 @@ export default function JobRolesPage() {
   const [pendingDeleteJobId, setPendingDeleteJobId] = useState<string | null>(null);
   const [editingRoleId, setEditingRoleId] = useState<string | null>(null);
 
-  const handleCreateRole = (role: Omit<JobRole, 'id'>) => {
-    createJobMutation.mutate(
-      {
+  const handleCreateRole = async (role: Omit<JobRole, 'id'>) => {
+    try {
+      const createdRole = await createJobMutation.mutateAsync({
         title: role.title,
         description: role.description,
+        auto_select_enabled: role.auto_select_enabled,
+        auto_select_threshold: role.auto_select_threshold,
+        require_hr_confirmation: role.require_hr_confirmation,
         skills: role.skills.map((s) => ({
           skill_name: s.name,
           required_level: s.level,
         })),
-      },
-      {
-        onSuccess: (createdRole) => {
-          const skillCount = Array.isArray(createdRole?.skills) ? createdRole.skills.length : role.skills.length;
-          showToast({
-            message: `Job role and ${skillCount} skill${skillCount === 1 ? '' : 's'} created successfully.`,
-            tone: 'success',
-          });
-        },
-        onError: (error) => {
-          console.error('Failed to create job role', error);
-          showToast({
-            message: error instanceof Error ? error.message : 'Failed to create job role',
-            tone: 'error',
-            durationMs: 3200,
-          });
-        },
-      }
-    );
+      });
+
+      const skillCount = Array.isArray(createdRole?.skills) ? createdRole.skills.length : role.skills.length;
+      showToast({
+        message: `Job role and ${skillCount} skill${skillCount === 1 ? '' : 's'} created successfully.`,
+        tone: 'success',
+      });
+    } catch (error) {
+      console.error('Failed to create job role', error);
+      showToast({
+        message: error instanceof Error ? error.message : 'Failed to create job role',
+        tone: 'error',
+        durationMs: 3200,
+      });
+      throw error;
+    }
   };
 
   const handleDeleteRole = (jobId: string) => {
@@ -101,9 +104,11 @@ export default function JobRolesPage() {
       return;
     }
 
-    deleteJobMutation.mutate(pendingDeleteJobId, {
+    const jobIdToDelete = pendingDeleteJobId;
+    setPendingDeleteJobId(null);
+
+    deleteJobMutation.mutate(jobIdToDelete, {
       onSuccess: () => {
-        setPendingDeleteJobId(null);
         showToast({
           message: 'Job role deleted successfully.',
           tone: 'success',
@@ -116,7 +121,6 @@ export default function JobRolesPage() {
           tone: 'error',
           durationMs: 3200,
         });
-        setPendingDeleteJobId(null);
       },
     });
   };
@@ -128,7 +132,7 @@ export default function JobRolesPage() {
         <p className="text-sm text-[var(--app-muted)]">Define new job roles and their required skill proficiencies.</p>
       </header>
 
-      <JobRoleForm onCreateRole={handleCreateRole} />
+      <JobRoleForm onCreateRole={handleCreateRole} isSubmitting={createJobMutation.isPending} />
 
       <section className="space-y-4">
         <h2 className="font-display text-2xl font-semibold text-[var(--app-text)]">Current System Roles</h2>
@@ -160,7 +164,7 @@ export default function JobRolesPage() {
         onClose={() => setPendingDeleteJobId(null)}
         onConfirm={confirmDeleteRole}
         title="Delete job role?"
-        message="This will permanently remove the role and related skill mappings."
+        message="This will permanently remove the role, related candidate analysis results, and shortlist entries for this job."
         confirmLabel="Delete role"
         confirmIcon={<Trash2 className="h-4 w-4" />}
       />
