@@ -4,6 +4,12 @@ import {
   AnalyzeResponse,
   AuthResponse,
   Candidate,
+  CandidateEnrichmentPayload,
+  CandidateEnrichmentResponse,
+  CandidatePreviewPayload,
+  CandidatePreviewResponse,
+  CandidateSkillSuggestionPayload,
+  CandidateSkillSuggestionResponse,
   GmailFetchResponse,
   GoogleLoginPayload,
   ResumeUploadResponse,
@@ -196,6 +202,42 @@ export const getCandidateById = async (candidateId: string): Promise<Candidate> 
       }
     }
 
+    throw new Error(getErrorMessage(error));
+  }
+};
+
+export const enrichCandidateProfile = async (
+  payload: CandidateEnrichmentPayload
+): Promise<CandidateEnrichmentResponse> => {
+  try {
+    const api = getApiClient();
+    const response = await api.post<CandidateEnrichmentResponse>('/api/candidate/enrich', payload);
+    return response.data;
+  } catch (error) {
+    throw new Error(getErrorMessage(error));
+  }
+};
+
+export const extractCandidatePreview = async (
+  payload: CandidatePreviewPayload
+): Promise<CandidatePreviewResponse> => {
+  try {
+    const api = getApiClient();
+    const response = await api.post<CandidatePreviewResponse>('/api/candidate/preview/extract', payload);
+    return response.data;
+  } catch (error) {
+    throw new Error(getErrorMessage(error));
+  }
+};
+
+export const suggestCandidateSkills = async (
+  payload: CandidateSkillSuggestionPayload
+): Promise<CandidateSkillSuggestionResponse> => {
+  try {
+    const api = getApiClient();
+    const response = await api.post<CandidateSkillSuggestionResponse>('/api/candidate/suggest/skills', payload);
+    return response.data;
+  } catch (error) {
     throw new Error(getErrorMessage(error));
   }
 };

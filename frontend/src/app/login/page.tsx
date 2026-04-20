@@ -109,26 +109,6 @@ function LoginContent() {
             }}
           />
 
-          <div className="flex items-center gap-2 text-xs font-medium uppercase tracking-wide text-subtle">
-            <span className="h-px flex-1 bg-[var(--app-border)]" />
-            <span>OR</span>
-            <span className="h-px flex-1 bg-[var(--app-border)]" />
-          </div>
-
-          <button
-            type="button"
-            onClick={() => {
-              if (typeof window !== 'undefined') {
-                window.localStorage.setItem('temp_dashboard_access', '1');
-                window.dispatchEvent(new Event('resume:auth-updated'));
-              }
-              router.push('/dashboard');
-            }}
-            className="btn-secondary flex h-11 w-full items-center justify-center gap-2 rounded-full px-4 text-sm font-medium hover:-translate-y-0.5"
-          >
-            Continue to Dashboard (Temp)
-          </button>
-
           {error ? (
             <p className="rounded-xl border border-[var(--app-danger-border)] bg-[var(--app-danger-bg)] px-3 py-2 text-sm text-[var(--app-danger-text)]">
               {error}

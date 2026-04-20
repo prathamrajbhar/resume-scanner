@@ -224,6 +224,26 @@ CREATE TABLE IF NOT EXISTS shortlisted_candidates (
 );
 
 -- -----------------------------------------------------------------------------
+-- Candidate Enrichment
+-- -----------------------------------------------------------------------------
+CREATE TABLE IF NOT EXISTS candidate_enrichment (
+  id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+  candidate_id UUID NOT NULL,
+  linkedin_url TEXT,
+  profile_text TEXT,
+  communication_score DOUBLE PRECISION NOT NULL DEFAULT 0,
+  domain_score DOUBLE PRECISION NOT NULL DEFAULT 0,
+  learning_score DOUBLE PRECISION NOT NULL DEFAULT 0,
+  stability_score DOUBLE PRECISION NOT NULL DEFAULT 0,
+  created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  CONSTRAINT fk_candidate_enrichment_candidate
+    FOREIGN KEY (candidate_id)
+    REFERENCES resumes(id)
+    ON DELETE CASCADE
+);
+
+-- -----------------------------------------------------------------------------
 -- Performance indexes
 -- -----------------------------------------------------------------------------
 CREATE INDEX IF NOT EXISTS idx_users_email ON users(email);
@@ -241,6 +261,7 @@ CREATE INDEX IF NOT EXISTS idx_job_skills_skill_id ON job_skills(skill_id);
 CREATE INDEX IF NOT EXISTS idx_skill_aliases_skill_id ON skill_aliases(skill_id);
 CREATE INDEX IF NOT EXISTS idx_shortlisted_candidates_job_id ON shortlisted_candidates(job_id);
 CREATE INDEX IF NOT EXISTS idx_shortlisted_candidates_resume_id ON shortlisted_candidates(resume_id);
+CREATE INDEX IF NOT EXISTS idx_candidate_enrichment_candidate_id ON candidate_enrichment(candidate_id);
 
 -- -----------------------------------------------------------------------------
 -- Updated-at maintenance helper

@@ -77,6 +77,22 @@ model Resume {
   created_at        DateTime  @default(now())
   user              User      @relation(fields: [uploaded_by], references: [id])
   analyses          Analysis[]
+  enrichments       CandidateEnrichment[]
+}
+
+model CandidateEnrichment {
+  id                  String   @id @default(uuid())
+  candidate_id        String
+  linkedin_url        String?
+  profile_text        String?
+  communication_score Float
+  domain_score        Float
+  learning_score      Float
+  stability_score     Float
+  created_at          DateTime @default(now())
+  candidate           Resume   @relation(fields: [candidate_id], references: [id])
+
+  @@index([candidate_id])
 }
 
 model Analysis {

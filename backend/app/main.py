@@ -7,6 +7,7 @@ from app.api.routes import (
     analyze, 
     resumes, 
     candidates, 
+    candidate_enrich,
     gmail, 
     skills, 
     jobs, 
@@ -58,6 +59,9 @@ app.include_router(jobs.router, prefix="/api/jobs", tags=["jobs"])
 app.include_router(analysis.router, prefix="/api/analysis", tags=["analysis"])
 app.include_router(chat.router, prefix="/api/chat", tags=["chat"])
 app.include_router(users.router, prefix="/api/users", tags=["users"])
+app.include_router(candidate_enrich.router, prefix="/api/candidate", tags=["candidate-enrichment"])
+app.include_router(candidate_enrich.router, prefix="/candidate", tags=["candidate-enrichment"])
+app.include_router(candidate_enrich.public_router, tags=["candidate-enrichment"])
 app.include_router(send_email.router, tags=["email"])
 
 @app.get("/")

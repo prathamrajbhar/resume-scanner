@@ -85,6 +85,62 @@ export interface GmailFetchResponse {
   new_candidates_count: number;
 }
 
+export interface CandidateEnrichmentPayload {
+  candidate_id: string;
+  linkedin_url?: string;
+  profile_text?: string;
+}
+
+export interface CandidatePreviewPayload {
+  text: string;
+}
+
+export interface CandidatePreviewResponse {
+  skills: string[];
+  keywords: string[];
+  readability: 'good' | 'average' | 'poor';
+}
+
+export interface SkillSuggestion {
+  name: string;
+  confidence: 'high' | 'medium' | 'low';
+}
+
+export interface CandidateSkillSuggestionPayload {
+  text?: string;
+}
+
+export interface CandidateSkillSuggestionResponse {
+  suggestions: SkillSuggestion[];
+}
+
+export interface ProfessionalInsight {
+  key: 'communication' | 'domain' | 'learning' | 'stability' | string;
+  title: string;
+  score: number;
+  explanation: string;
+  reasons: string[];
+  evidence: string[];
+}
+
+export interface CandidateEnrichmentResponse {
+  id: string;
+  candidate_id: string;
+  linkedin_url?: string | null;
+  profile_text?: string | null;
+  communication_score: number;
+  domain_score: number;
+  learning_score: number;
+  stability_score: number;
+  keywords: string[];
+  experience_signals: string[];
+  education_signals: string[];
+  certifications: string[];
+  confidence_score: number;
+  guidance_message?: string | null;
+  insights: ProfessionalInsight[];
+}
+
 export type AppTheme = 'light' | 'dark' | 'system';
 
 export interface NotificationSettings {

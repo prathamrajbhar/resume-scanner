@@ -1,5 +1,5 @@
 from pydantic import BaseModel, Field, EmailStr
-from typing import List, Optional, Any, Dict
+from typing import List, Optional, Any, Dict, Literal
 from datetime import datetime
 
 # Auth & User
@@ -214,3 +214,59 @@ class CandidateDetail(BaseModel):
 class GmailFetchResponse(BaseModel):
     total_processed: int
     new_candidates_count: int
+
+
+class CandidateEnrichmentRequest(BaseModel):
+    candidate_id: str
+    linkedin_url: Optional[str] = None
+    profile_text: Optional[str] = None
+
+
+class CandidatePreviewExtractRequest(BaseModel):
+    text: str
+
+
+class CandidatePreviewExtractResponse(BaseModel):
+    skills: List[str] = []
+    keywords: List[str] = []
+    readability: Literal["good", "average", "poor"]
+
+
+class CandidateSkillSuggestionRequest(BaseModel):
+    text: Optional[str] = None
+
+
+class SkillSuggestion(BaseModel):
+    name: str
+    confidence: Literal["high", "medium", "low"]
+
+
+class CandidateSkillSuggestionResponse(BaseModel):
+    suggestions: List[SkillSuggestion] = []
+
+
+class ProfessionalInsight(BaseModel):
+    key: str
+    title: str
+    score: float
+    explanation: str
+    reasons: List[str] = []
+    evidence: List[str] = []
+
+
+class CandidateEnrichmentResponse(BaseModel):
+    id: str
+    candidate_id: str
+    linkedin_url: Optional[str] = None
+    profile_text: Optional[str] = None
+    communication_score: float
+    domain_score: float
+    learning_score: float
+    stability_score: float
+    keywords: List[str] = []
+    experience_signals: List[str] = []
+    education_signals: List[str] = []
+    certifications: List[str] = []
+    confidence_score: float = 0
+    guidance_message: Optional[str] = None
+    insights: List[ProfessionalInsight] = []

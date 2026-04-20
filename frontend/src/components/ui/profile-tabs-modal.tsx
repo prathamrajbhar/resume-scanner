@@ -239,48 +239,47 @@ export function ProfileTabsModal({ isOpen, onClose }: ProfileTabsModalProps) {
                 activeTab === 'account' ? 'opacity-100' : 'pointer-events-none opacity-0'
               }`}
             >
-              <div className="space-y-6">
+              <div className="flex flex-col gap-6 text-left">
                 <h3 className="text-xl font-semibold text-gray-900">Account</h3>
 
-                <div className="grid grid-cols-[120px_1fr] items-center gap-x-6 gap-y-4">
-                  <label htmlFor="profile-name" className="text-gray-600 text-sm">
+                <div className="flex flex-col gap-2">
+                  <label htmlFor="profile-name" className="text-sm text-gray-500">
                     Name
                   </label>
-                  <input
-                    id="profile-name"
-                    value={name}
-                    onChange={(event) => setName(event.target.value)}
-                    className="w-full rounded-lg border border-gray-300 px-4 py-2 text-sm text-gray-800 focus:ring-2 focus:ring-blue-500"
-                    placeholder="Firstname lastname like vice"
-                  />
-
-                  <label className="text-gray-600 text-sm">Email</label>
-                  <p className="text-gray-800 text-sm">{email}</p>
-
-                  <div />
-                  <div className="col-start-2">
+                  <div className="flex items-center gap-3">
+                    <input
+                      id="profile-name"
+                      value={name}
+                      onChange={(event) => setName(event.target.value)}
+                      className="flex-1 rounded-lg border border-gray-300 px-3 py-2 text-sm text-gray-800 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                      placeholder="Firstname lastname like vice"
+                    />
                     <button
                       type="button"
                       onClick={handleSaveName}
-                      className="rounded-lg bg-blue-600 px-4 py-2 text-white hover:bg-blue-700"
+                      className="rounded-lg bg-blue-600 px-4 py-2 text-white transition hover:bg-blue-700"
                     >
-                      Save name
+                      Save
                     </button>
                   </div>
                 </div>
 
+                <div className="flex flex-col gap-1">
+                  <label className="text-sm text-gray-500">Email</label>
+                  <p className="text-gray-700">{email}</p>
+                </div>
+
                 {status ? <p className="text-sm text-gray-600">{status}</p> : null}
 
-                <div>
-                  <p className="text-lg font-medium text-gray-900">Delete account</p>
-                  <p className="mt-1 flex items-center gap-1.5 text-sm text-red-500">
-                    <AlertTriangle className="h-3.5 w-3.5" />
-                    Permanently remove your account and local app data.
+                <div className="mt-4 border-t pt-6">
+                  <h3 className="text-sm font-semibold text-gray-800">Delete account</h3>
+                  <p className="mt-1 text-sm text-red-500">
+                    Permanently remove your account and all data.
                   </p>
                   <button
                     type="button"
                     onClick={() => setIsDeleteAccountConfirmOpen(true)}
-                    className="mt-3 rounded-lg border border-red-300 bg-white px-4 py-2 text-red-600 hover:bg-red-50"
+                    className="mt-3 rounded-lg border border-red-300 px-4 py-2 text-red-600 transition hover:bg-red-50"
                   >
                     Delete account
                   </button>
