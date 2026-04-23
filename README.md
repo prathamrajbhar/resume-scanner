@@ -22,6 +22,18 @@ A production-ready AI-powered HR application with a ChatGPT-style interface for 
 
 ## Setup Instructions
 
+For a complete walkthrough of the environment setup, including local LLM configuration with **Ollama**, please refer to the detailed guide:
+
+👉 [**Full Setup Guide (SETUP_GUIDE.md)**](./SETUP_GUIDE.md)
+
+For instructions on how to use the application features like resume ranking, analysis, and AI chat:
+
+👉 [**User Usage Guide (USAGE_GUIDE.md)**](./USAGE_GUIDE.md)
+
+---
+
+### Quick Start (Abbreviated)
+
 ### 1. Backend Setup (FastAPI)
 1.  **Open a terminal** and navigate to the `backend` folder:
     ```bash

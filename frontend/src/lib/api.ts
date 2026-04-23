@@ -26,7 +26,7 @@ const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000';
 const getApiClient = () => {
   const client = axios.create({
     baseURL: API_BASE_URL,
-    timeout: 30000,
+    timeout: 300000, // 5 minutes for AI processing
   });
 
   client.interceptors.request.use((config) => {
@@ -559,13 +559,13 @@ export const getRecentAnalyses = async (): Promise<any[]> => {
 
 export const runAnalysis = async (jobId: string): Promise<any> => {
   const api = getApiClient();
-  const response = await api.post('/api/analysis/', null, { params: { job_id: jobId } });
+  const response = await api.post('/api/analysis/', { job_id: jobId, resume_ids: [] });
   return response.data;
 };
 
 export const runAnalysisForResumes = async (jobId: string, resumeIds: string[]): Promise<any[]> => {
   const api = getApiClient();
-  const response = await api.post('/api/analysis/', resumeIds, { params: { job_id: jobId } });
+  const response = await api.post('/api/analysis/', { job_id: jobId, resume_ids: resumeIds });
   return response.data;
 };
 

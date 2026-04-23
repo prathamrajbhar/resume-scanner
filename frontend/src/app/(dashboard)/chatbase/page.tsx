@@ -3,7 +3,7 @@
 import { ChangeEvent, useEffect, useMemo, useRef, useState } from 'react';
 import Image from 'next/image';
 import { useRouter } from 'next/navigation';
-import { ArrowLeft, LogOut, Mail, MessageSquarePlus, PanelLeft, Settings, User as UserIcon } from 'lucide-react';
+import { ArrowLeft, LogOut, Mail, MessageSquarePlus, PanelLeft, Rocket, Settings, User as UserIcon } from 'lucide-react';
 import { getCandidates, getJobById, runAnalysisForResumes, shortlistCandidate, uploadResumes } from '@/lib/api';
 import { CandidateDetailData, CandidateDetailModal } from '@/components/analyze/CandidateDetailModal';
 import { AnalysisButton } from '@/components/chat/analysis-button';
@@ -132,9 +132,9 @@ const parseLegacyResultsFromMessages = (messages: unknown): ResultCard[] => {
         required_skills: [],
         is_shortlisted: false,
         shortlisted_type: null,
-      } satisfies ResultCard;
+      } as ResultCard;
     })
-    .filter((item): item is ResultCard => Boolean(item));
+    .filter((item): item is ResultCard => item !== null);
 
   return parsed;
 };
@@ -1273,7 +1273,7 @@ export default function ChatbasePage() {
 
                         <Button
                           type="button"
-                          variant="outline"
+                          variant="ghost"
                           className="mt-4 w-full border-2 border-slate-300 bg-white font-semibold text-slate-900 shadow-sm hover:border-slate-400 hover:bg-slate-50"
                           onClick={() => handleViewCandidateDetails(candidate)}
                         >
@@ -1288,7 +1288,7 @@ export default function ChatbasePage() {
                           <div className="mt-2 grid grid-cols-2 gap-2">
                             <Button
                               type="button"
-                              variant="outline"
+                              variant="ghost"
                               className="h-8 text-xs"
                               onClick={() => handleShortlistCandidate(candidate, 'select')}
                             >
@@ -1311,7 +1311,7 @@ export default function ChatbasePage() {
                     <div className="mt-5 flex justify-center">
                       <Button
                         type="button"
-                        variant="outline"
+                        variant="ghost"
                         onClick={() => setShowAllCandidates((prev) => !prev)}
                       >
                         {showAllCandidates ? 'Show Top 5' : `View More (${topCandidates.length - 5})`}
@@ -1324,6 +1324,41 @@ export default function ChatbasePage() {
           </div>
         )}
       </div>
+
+      {sending && (
+        <div className="fixed inset-0 z-[100] flex items-center justify-center bg-slate-900/60 backdrop-blur-md transition-all duration-300">
+          <div className="flex flex-col items-center gap-6 text-center max-w-md p-8 bg-white rounded-3xl shadow-2xl border border-slate-100">
+            <div className="relative">
+              <div className="h-20 w-20 animate-spin rounded-full border-b-4 border-indigo-600"></div>
+              <div className="absolute inset-0 flex items-center justify-center">
+                <Rocket className="h-8 w-8 text-indigo-600 animate-bounce" />
+              </div>
+            </div>
+            
+            <div className="space-y-2">
+              <h3 className="text-2xl font-bold text-slate-800">Deep AI Analysis</h3>
+              <p className="text-indigo-600 font-medium animate-pulse">Ollama is evaluating candidate fit...</p>
+              <p className="text-slate-500 text-sm italic">This may take 1-2 minutes for large datasets</p>
+            </div>
+            
+            <div className="w-full space-y-3">
+              <div className="flex justify-between text-xs font-bold text-slate-600 uppercase tracking-widest">
+                <span>Progress</span>
+                <span>{Math.round((uploadMetrics.processed / (uploadMetrics.total || 1)) * 100)}%</span>
+              </div>
+              <div className="w-full h-3 bg-slate-100 rounded-full overflow-hidden border border-slate-200">
+                <div 
+                  className="h-full bg-gradient-to-r from-indigo-600 to-violet-600 transition-all duration-500 rounded-full"
+                  style={{ width: `${(uploadMetrics.processed / (uploadMetrics.total || 1)) * 100}%` }}
+                ></div>
+              </div>
+              <p className="text-sm font-semibold text-slate-700">
+                Processed {uploadMetrics.processed} of {uploadMetrics.total || selectedFiles.length} resumes
+              </p>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

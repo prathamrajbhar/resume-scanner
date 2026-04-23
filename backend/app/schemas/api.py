@@ -107,6 +107,10 @@ class ResumeSimple(BaseModel):
     class Config:
         from_attributes = True
 
+class AnalysisRequest(BaseModel):
+    job_id: str
+    resume_ids: List[str]
+
 class AnalysisResult(BaseModel):
     candidate_name: str
     score: float
